@@ -14,44 +14,48 @@
   <script src="app.js" defer></script>
 </head>
 <body>
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
   <a class="skip-link" href="#menu">Skip to menu</a>
 
   <header>
     <div class="wrap nav">
       <a class="brand" href="#top" aria-label="Bale Bella Bakehouse home">
         <img src="logo.svg" alt="Bale Bella Bakehouse logo">
-        <div>
-          <strong>Bale Bella Bakehouse</strong>
-          <span>San Fernando, Pampanga · EST 2026</span>
-        </div>
+        <div><strong>Bale Bella Bakehouse</strong><span>San Fernando, Pampanga · EST 2026</span></div>
       </a>
       <nav class="navlinks" aria-label="Main navigation">
         <a class="pill menu-link" href="#menu">Menu</a>
         <a class="pill" href="#how">How it works</a>
-        <a class="pill" href="#order">Order <span class="count" id="cartCount">0</span></a>
+        <a class="pill cart-link" href="#order">Order <span class="count" id="cartCount">0</span></a>
       </nav>
     </div>
   </header>
 
   <main id="top">
     <section class="hero">
+      <div class="hero-orb orb-one parallax" data-speed="0.10" aria-hidden="true"></div>
+      <div class="hero-orb orb-two parallax" data-speed="-0.08" aria-hidden="true"></div>
+      <div class="hero-spark spark-one parallax" data-speed="0.18" aria-hidden="true">✦</div>
+      <div class="hero-spark spark-two parallax" data-speed="-0.13" aria-hidden="true">♥</div>
       <div class="wrap hero-grid">
         <div class="reveal">
           <span class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Now taking pre-orders</span>
           <h1>Sweet things.<br>Made at home.</h1>
-          <p class="hero-copy">Bale Bella Bakehouse makes small-batch cookies, fudgy brownies, banana loaves and Basque cheesecake — warm, playful and made for sharing.</p>
+          <p class="hero-copy">Small-batch cookies, fudgy brownies, banana loaves and Basque cheesecake — baked in San Fernando, Pampanga and made for sharing.</p>
           <div class="cta">
             <a class="primary" href="#menu">🍪 See the menu</a>
             <a class="secondary" href="#order">Start an order →</a>
           </div>
           <div class="facts" aria-label="Bale Bella highlights">
-            <div class="fact"><b>Fresh-baked</b><small>Made in small batches</small></div>
-            <div class="fact"><b>Pre-order</b><small>Ideal for weekend bake drops</small></div>
-            <div class="fact"><b>Local</b><small>San Fernando, Pampanga</small></div>
+            <div class="fact"><b>Fresh-baked</b><small>Small batches, not shelf fillers</small></div>
+            <div class="fact"><b>Pre-order</b><small>Lead times adjust to your cart</small></div>
+            <div class="fact"><b>GCash ready</b><small>Pay only after confirmation</small></div>
           </div>
         </div>
 
-        <div class="hero-card reveal">
+        <div class="hero-card reveal parallax-card" id="heroCard">
+          <div class="steam steam-a" aria-hidden="true"></div>
+          <div class="steam steam-b" aria-hidden="true"></div>
           <img src="logo.svg" alt="Bale Bella Bakehouse">
           <div class="mini-note"><b>From our bale to yours 🤎</b>Mayumu. Manyaman. Made with Lugud.</div>
         </div>
@@ -61,17 +65,14 @@
     <section id="menu">
       <div class="wrap">
         <div class="section-head reveal">
-          <div>
-            <span class="eyebrow">Our first bake menu</span>
-            <h2>Pick your happy.</h2>
-          </div>
-          <p>Signature sweets for merienda, gifts, celebrations and those “one more piece” moments. Add anything you like — your cart stays saved on this device.</p>
+          <div><span class="eyebrow">Our bake menu</span><h2>Pick your happy.</h2></div>
+          <p>Choose singles or boxes where available. Product availability and lead time appear directly on each item.</p>
         </div>
 
         <div class="steps reveal" aria-label="Ordering steps">
-          <div class="step"><span class="step-num">1</span><div><b>Choose your sweets</b><small>Add items and adjust quantities.</small></div></div>
-          <div class="step"><span class="step-num">2</span><div><b>Add your details</b><small>Choose pickup or delivery.</small></div></div>
-          <div class="step"><span class="step-num">3</span><div><b>Send to Bale Bella</b><small>WhatsApp opens with the order ready.</small></div></div>
+          <div class="step"><span class="step-num">1</span><div><b>Choose your sweets</b><small>Select a size or box, then add it.</small></div></div>
+          <div class="step"><span class="step-num">2</span><div><b>Choose the occasion</b><small>Personal, gift or corporate.</small></div></div>
+          <div class="step"><span class="step-num">3</span><div><b>Confirm in WhatsApp</b><small>We confirm stock, schedule and payment.</small></div></div>
         </div>
 
         <div class="filters" id="filters" aria-label="Filter menu by category"></div>
@@ -79,96 +80,105 @@
       </div>
     </section>
 
+    <section class="experience-band reveal" aria-label="Bale Bella promise">
+      <div class="marquee" aria-hidden="true">
+        <span>FRESH BAKES ✦ SAN FERNANDO ✦ GIFTABLE BOXES ✦ BROWN BUTTER ✦ TABLEA ✦ MADE WITH LUGUD ✦ </span>
+        <span>FRESH BAKES ✦ SAN FERNANDO ✦ GIFTABLE BOXES ✦ BROWN BUTTER ✦ TABLEA ✦ MADE WITH LUGUD ✦ </span>
+      </div>
+    </section>
+
     <section id="order">
       <div class="wrap order-wrap">
         <div class="section-head reveal">
-          <div>
-            <span class="eyebrow">Easy ordering</span>
-            <h2>Your Bale Bella order.</h2>
-          </div>
-          <p>No account needed. Fill in the details, then send the order straight to Bale Bella on WhatsApp or copy it for Messenger.</p>
+          <div><span class="eyebrow">Easy ordering</span><h2>Your Bale Bella order.</h2></div>
+          <p>No account needed. Build the order here, then send the full request to Bale Bella on WhatsApp.</p>
         </div>
 
         <div class="order-grid">
           <div class="panel reveal">
-            <h3>Customer details</h3>
+            <h3>Order details</h3>
             <div class="form">
-              <div class="field">
-                <label for="customerName">Name</label>
-                <input id="customerName" autocomplete="name" placeholder="Your name">
-                <small class="field-error" id="customerNameError" aria-live="polite"></small>
+              <div class="field full">
+                <label>Order type</label>
+                <div class="segments three" id="orderTypeSegments">
+                  <button type="button" class="seg active" data-order-type="personal" aria-pressed="true">Personal</button>
+                  <button type="button" class="seg" data-order-type="gift" aria-pressed="false">Gift</button>
+                  <button type="button" class="seg" data-order-type="corporate" aria-pressed="false">Corporate</button>
+                </div>
               </div>
 
-              <div class="field">
-                <label for="customerPhone">Mobile</label>
-                <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567">
-                <small class="field-error" id="customerPhoneError" aria-live="polite"></small>
+              <div class="field"><label for="customerName">Name</label><input id="customerName" autocomplete="name" placeholder="Your name"><small class="field-error" id="customerNameError"></small></div>
+              <div class="field"><label for="customerPhone">Mobile</label><input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567"><small class="field-error" id="customerPhoneError"></small></div>
+
+              <div class="field full conditional" id="giftFields" hidden>
+                <div class="conditional-grid">
+                  <div class="field"><label for="recipientName">Recipient name</label><input id="recipientName" placeholder="Who is receiving it?"><small class="field-error" id="recipientNameError"></small></div>
+                  <div class="field"><label for="giftMessage">Gift message <span class="optional">(optional)</span></label><input id="giftMessage" maxlength="180" placeholder="A short note from you"></div>
+                </div>
+              </div>
+
+              <div class="field full conditional" id="corporateFields" hidden>
+                <div class="conditional-grid">
+                  <div class="field"><label for="companyName">Company / organization</label><input id="companyName" placeholder="Company name"><small class="field-error" id="companyNameError"></small></div>
+                  <div class="field"><label for="guestCount">Estimated quantity / guests</label><input id="guestCount" type="number" min="10" step="1" placeholder="e.g. 50"><small class="field-error" id="guestCountError"></small></div>
+                  <div class="field full"><label for="corporateNotes">Customization <span class="optional">(optional)</span></label><input id="corporateNotes" placeholder="Logo stickers, event date, individual packs, ribbon, etc."></div>
+                </div>
               </div>
 
               <div class="field full">
                 <label>Fulfillment</label>
-                <div class="segments">
-                  <button type="button" class="seg active" data-mode="pickup" aria-pressed="true">Pickup</button>
-                  <button type="button" class="seg" data-mode="delivery" aria-pressed="false">Delivery</button>
+                <div class="segments"><button type="button" class="seg active" data-mode="pickup" aria-pressed="true">Pickup</button><button type="button" class="seg" data-mode="delivery" aria-pressed="false">Delivery</button></div>
+                <small class="delivery-hint" id="deliveryHint">Delivery fee is quoted separately based on location and courier availability.</small>
+              </div>
+
+              <div class="field"><label for="orderDate">Preferred date</label><input id="orderDate" type="date"><small class="field-error" id="orderDateError"></small><small class="lead-hint" id="leadHint"></small></div>
+              <div class="field"><label for="orderTime">Preferred time</label><select id="orderTime"><option>10:00 AM – 12:00 PM</option><option>1:00 PM – 3:00 PM</option><option>3:00 PM – 5:00 PM</option><option>5:00 PM – 7:00 PM</option></select></div>
+
+              <div class="field full" id="addressField" hidden><label for="address">Delivery address</label><input id="address" autocomplete="street-address" placeholder="Subdivision / barangay / landmark"><small class="field-error" id="addressError"></small></div>
+
+              <div class="field full"><label for="notes">Order notes <span class="optional">(optional)</span></label><textarea id="notes" placeholder="Allergies, special request, preferred courier, etc."></textarea></div>
+
+              <div class="field full">
+                <label>Preferred payment</label>
+                <div class="payment-options" id="paymentOptions">
+                  <button type="button" class="payment-option active" data-payment="GCash" aria-pressed="true"><span class="payment-icon">G</span><span><b>GCash</b><small>Pay after confirmation</small></span></button>
+                  <button type="button" class="payment-option" data-payment="Bank transfer" aria-pressed="false"><span class="payment-icon">₱</span><span><b>Bank transfer</b><small>Details sent in chat</small></span></button>
+                  <button type="button" class="payment-option" data-payment="Cash on pickup" aria-pressed="false"><span class="payment-icon">⌂</span><span><b>Cash on pickup</b><small>When available</small></span></button>
                 </div>
-                <small class="delivery-hint" id="deliveryHint">Delivery fee is quoted separately based on your location in/around San Fernando.</small>
-              </div>
-
-              <div class="field">
-                <label for="orderDate">Preferred date</label>
-                <input id="orderDate" type="date">
-                <small class="field-error" id="orderDateError" aria-live="polite"></small>
-              </div>
-
-              <div class="field">
-                <label for="orderTime">Preferred time</label>
-                <select id="orderTime">
-                  <option>10:00 AM – 12:00 PM</option>
-                  <option>1:00 PM – 3:00 PM</option>
-                  <option>3:00 PM – 5:00 PM</option>
-                  <option>5:00 PM – 7:00 PM</option>
-                </select>
-                <small class="field-error" aria-hidden="true"></small>
-              </div>
-
-              <div class="field full" id="addressField" hidden>
-                <label for="address">Delivery address</label>
-                <input id="address" autocomplete="street-address" placeholder="Subdivision / barangay / landmark">
-                <small class="field-error" id="addressError" aria-live="polite"></small>
               </div>
 
               <div class="field full">
-                <label for="notes">Notes <span class="optional">(optional)</span></label>
-                <textarea id="notes" placeholder="Gift note, allergies, special request, etc."></textarea>
-                <small class="field-error" aria-hidden="true"></small>
+                <div class="gcash-card" id="gcashCard">
+                  <div class="gcash-top"><div class="gcash-badge">G</div><div><b>GCash payment instructions</b><small>For safer payments, do not send money before we confirm your order.</small></div></div>
+                  <ol>
+                    <li>Send your order request first.</li>
+                    <li>Wait for Bale Bella to confirm availability, final amount and delivery fee.</li>
+                    <li>We will send the official GCash number / QR and account name in WhatsApp.</li>
+                    <li>Use your order reference in the payment note when possible.</li>
+                    <li>Send the payment receipt screenshot back in the same WhatsApp conversation.</li>
+                  </ol>
+                  <p class="payment-warning">Never pay a different number sent outside the Bale Bella WhatsApp conversation.</p>
+                </div>
               </div>
             </div>
           </div>
 
           <aside class="panel cart-panel reveal" aria-label="Order summary">
-            <h3>Your box</h3>
+            <div class="cart-heading"><h3>Your box</h3><button type="button" class="text-btn" id="clearCartBtn">Clear</button></div>
             <div class="cart-list" id="cartList" aria-live="polite"></div>
-
             <div class="summary">
               <div class="summary-row"><span>Subtotal</span><b id="subtotal">₱0</b></div>
               <div class="summary-row"><span>Delivery</span><span id="delivery">Pickup</span></div>
+              <div class="summary-row"><span>Payment</span><span id="paymentSummary">GCash after confirmation</span></div>
               <div class="summary-row total"><span>Current total</span><span id="total">₱0</span></div>
             </div>
 
-            <button type="button" class="checkout" id="sendBtn" disabled>
-              <span aria-hidden="true">💬</span> Send order via WhatsApp
-            </button>
+            <button type="button" class="checkout" id="sendBtn" disabled><span aria-hidden="true">💬</span> Send order via WhatsApp</button>
             <button type="button" class="copy-btn" id="copyBtn">📋 Copy order for Messenger</button>
+            <button type="button" class="share-btn" id="shareBtn">↗ Share Bale Bella menu</button>
 
-            <div class="secure-note">
-              <span aria-hidden="true">🔒</span>
-              <span>Your order details are created in your browser and sent only when you choose WhatsApp or copy them.</span>
-            </div>
-
-            <div class="contact-strip">
-              <span>Need help?</span>
-              <a id="businessPhone" href="https://wa.me/639171344775" target="_blank" rel="noopener">0917 134 4775</a>
-            </div>
+            <div class="secure-note"><span aria-hidden="true">🔒</span><span>Your details stay in this browser until you choose to send or copy the order.</span></div>
+            <div class="contact-strip"><span>Need help?</span><a href="https://wa.me/639171344775" target="_blank" rel="noopener">0917 134 4775</a></div>
           </aside>
         </div>
       </div>
@@ -176,44 +186,32 @@
 
     <section id="how">
       <div class="wrap">
-        <div class="section-head reveal">
-          <div><span class="eyebrow">Simple by design</span><h2>How ordering works.</h2></div>
-          <p>This is a pre-order system, so you get a human confirmation before anything is final.</p>
-        </div>
+        <div class="section-head reveal"><div><span class="eyebrow">Simple by design</span><h2>How ordering works.</h2></div><p>Everything stays flexible until Bale Bella confirms your bake slot.</p></div>
         <div class="how-grid">
-          <article class="how-card reveal"><div class="how-icon">🛍️</div><h3>Build your box</h3><p>Add your favourites. Quantities and totals update instantly, and the cart stays on your device if you refresh.</p></article>
-          <article class="how-card reveal"><div class="how-icon">💬</div><h3>Send the request</h3><p>WhatsApp opens with your complete order, reference number, preferred schedule and contact details already prepared.</p></article>
-          <article class="how-card reveal"><div class="how-icon">🤎</div><h3>We confirm it</h3><p>Bale Bella confirms availability, payment instructions and final pickup or delivery arrangements with you.</p></article>
+          <article class="how-card reveal"><div class="how-icon">🛍️</div><h3>Build your box</h3><p>Choose products and box sizes. The app automatically adjusts the earliest available date based on the longest lead-time item.</p></article>
+          <article class="how-card reveal"><div class="how-icon">💬</div><h3>Confirm in WhatsApp</h3><p>Your complete order, reference number, schedule and payment preference are pre-filled for you.</p></article>
+          <article class="how-card reveal"><div class="how-icon">📲</div><h3>Pay securely</h3><p>For GCash, wait for confirmation first. We send the official payment details and you reply with your receipt.</p></article>
         </div>
       </div>
     </section>
 
     <section id="faq">
       <div class="wrap">
-        <div class="section-head reveal">
-          <div><span class="eyebrow">Good to know</span><h2>Quick questions.</h2></div>
-        </div>
+        <div class="section-head reveal"><div><span class="eyebrow">Good to know</span><h2>Quick questions.</h2></div></div>
         <div class="faq">
-          <details class="reveal"><summary>Is my order confirmed immediately?</summary><p>Not yet. Sending the request starts the conversation. Bale Bella will confirm product availability, schedule and payment before the order becomes final.</p></details>
-          <details class="reveal"><summary>How does delivery work?</summary><p>Select Delivery and add your location. Delivery cost is quoted separately depending on the destination and available courier.</p></details>
-          <details class="reveal"><summary>Can I order for gifts or events?</summary><p>Yes. Add your request in the Notes field, including quantities, gift message or event details. Larger orders may need additional lead time.</p></details>
-          <details class="reveal"><summary>What if the Copy button does not work?</summary><p>The app automatically uses a second copy method when browser clipboard access is unavailable. If both are blocked, it shows the full order text so you can copy it manually.</p></details>
+          <details class="reveal"><summary>Is my order confirmed immediately?</summary><p>No. Sending the request starts the conversation. Bale Bella confirms availability, schedule, final total and payment details before the order becomes final.</p></details>
+          <details class="reveal"><summary>When do I pay with GCash?</summary><p>Only after Bale Bella confirms the order. We will send the official GCash details in your WhatsApp conversation. Send your receipt there using the same order reference.</p></details>
+          <details class="reveal"><summary>What are the lead times?</summary><p>Cookies and brownies generally need at least one day, while loaves and cheesecakes may need more. Your selected cart automatically updates the earliest selectable date.</p></details>
+          <details class="reveal"><summary>Can I order for gifts or events?</summary><p>Yes. Choose Gift or Corporate in the order form. You can add a recipient message, company details and customization requests.</p></details>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="wrap footer-inner">
-      <div>© 2026 Bale Bella Bakehouse · San Fernando, Pampanga</div>
-      <div>Mayumu. Manyaman. Made with Lugud. 🤎</div>
-    </div>
-  </footer>
+  <footer class="footer"><div class="wrap footer-inner"><div>© 2026 Bale Bella Bakehouse · San Fernando, Pampanga</div><div>Mayumu. Manyaman. Made with Lugud. 🤎</div></div></footer>
 
-  <div class="mobile-bar">
-    <button type="button" id="mobileCartBtn"><span id="mobileCount">0</span> items · <span id="mobileTotal">₱0</span> · View order</button>
-  </div>
-
+  <div class="mobile-bar"><button type="button" id="mobileCartBtn"><span id="mobileCount">0</span> items · <span id="mobileTotal">₱0</span> · View order</button></div>
   <div class="toast" id="toast" role="status" aria-live="polite">Added</div>
+  <dialog id="copyDialog" class="copy-dialog"><form method="dialog"><div class="dialog-head"><b>Copy your order</b><button aria-label="Close">×</button></div><p>Your browser blocked automatic copying. Select the text below and copy it manually.</p><textarea id="manualCopyText" readonly></textarea><button class="primary dialog-close">Done</button></form></dialog>
 </body>
 </html>
