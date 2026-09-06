@@ -1,0 +1,64 @@
+name: Restore ASCII Logo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-ascii-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore ASCII logo without label text
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          author = '<!-- Author: Johnpel Quingua <johnpelquingua@gmail.com> -->'
+          if 'FROM OUR BALE TO YOURS.' not in s.split('<!doctype html>',1)[0]:
+              logo = r'''<!--
+
+                         /\
+                    ____/  \____
+                 .-'              '-.
+               .'      BALE BELLA      '.
+              /        +----+----+        \
+             /         | [] | [] |         \
+            /__________|____|____|__________\
+
+                  B A K E H O U S E
+                       EST 2026
+
+                         .-.-.
+                        (     )
+                         \   /
+                          \ /
+                           V
+
+                 FROM OUR BALE TO YOURS.
+
+             Johnpel Quingua
+             johnpelquingua@gmail.com
+
+-->'''
+              if author not in s:
+                  raise SystemExit('Author marker not found')
+              s = s.replace(author, author + '\n' + logo, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit change and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/restore-ascii-logo.yml
+          git add -A
+          git commit -m "Restore Bale Bella ASCII logo without label text"
+          git push
