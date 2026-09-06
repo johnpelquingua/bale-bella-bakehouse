@@ -1,0 +1,89 @@
+name: CTA Rail Patch
+on:
+  push:
+    paths:
+      - '.github/workflows/cta-rail-patch.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Add persistent CTAs and inline conversion prompts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          index=Path('index.html')
+          css=Path('site.css')
+          js=Path('site.js')
+          h=index.read_text()
+          c=css.read_text()
+          j=js.read_text()
+
+          story_cta='<section class="page-cta" aria-label="Browse and share Bale Bella"><div class="wrap"><div class="page-cta-card"><div><span class="page-cta-kicker">Fresh from our bale</span><strong>See something you love?</strong><small>Browse the full menu or share Bale Bella with someone who deserves something sweet.</small></div><div class="page-cta-actions"><a class="page-cta-primary" href="#menu">🍪 Browse menu</a><button type="button" class="page-cta-secondary" data-social-share>↗ Share the menu</button></div></div></div></section>'
+          location_cta='<section class="page-cta" aria-label="Start a Bale Bella order"><div class="wrap"><div class="page-cta-card"><div><span class="page-cta-kicker">San Fernando, Pampanga</span><strong>Ready to plan your box?</strong><small>Start your order online or message Bale Bella directly for pickup, delivery, gifts or corporate requests.</small></div><div class="page-cta-actions"><a class="page-cta-primary" href="#order">🤎 Start an order</a><a class="page-cta-secondary" href="https://wa.me/639171344775" target="_blank" rel="noopener">💬 WhatsApp us</a></div></div></div></section>'
+          how_cta='<section class="page-cta" aria-label="Share Bale Bella Bakehouse"><div class="wrap"><div class="page-cta-card"><div><span class="page-cta-kicker">From our bale to yours</span><strong>Not ordering yet? Help us spread the word.</strong><small>Share the Bale Bella menu with friends, family, officemates or anyone looking for fresh bakes in San Fernando.</small></div><div class="page-cta-actions"><button type="button" class="page-cta-primary" data-social-share>↗ Share Bale Bella</button><a class="page-cta-secondary" href="#menu">View menu</a></div></div></div></section>'
+          rail='<aside class="floating-cta" aria-label="Quick Bale Bella actions"><a class="float-action float-menu" href="#menu" aria-label="View Bale Bella menu"><span class="float-icon">🍪</span><span class="float-label">Menu</span></a><a class="float-action float-order" href="#order" aria-label="Start a Bale Bella order"><span class="float-icon">🤎</span><span class="float-label">Order</span></a><a class="float-action float-whatsapp" href="https://wa.me/639171344775" target="_blank" rel="noopener" aria-label="Message Bale Bella on WhatsApp"><span class="float-icon">💬</span><span class="float-label">WhatsApp</span></a><button type="button" class="float-action float-share" data-social-share aria-label="Share the Bale Bella menu"><span class="float-icon">↗</span><span class="float-label">Share</span></button></aside>'
+
+          if 'aria-label="Browse and share Bale Bella"' not in h:
+              marker='</section> <section id="menu">'
+              if marker not in h: raise SystemExit('Story/menu marker not found')
+              h=h.replace(marker,'</section>'+story_cta+' <section id="menu">',1)
+          if 'aria-label="Start a Bale Bella order"' not in h:
+              marker='</section> <section id="how">'
+              if marker not in h: raise SystemExit('Location/how marker not found')
+              h=h.replace(marker,'</section>'+location_cta+' <section id="how">',1)
+          if 'aria-label="Share Bale Bella Bakehouse"' not in h:
+              marker='</section> <section id="faq">'
+              if marker not in h: raise SystemExit('How/faq marker not found')
+              h=h.replace(marker,'</section>'+how_cta+' <section id="faq">',1)
+          if 'class="floating-cta"' not in h:
+              marker='<div class="mobile-bar">'
+              if marker not in h: raise SystemExit('Mobile bar marker not found')
+              h=h.replace(marker,rail+marker,1)
+
+          css_add='''.page-cta{padding:12px 0 30px}.page-cta-card{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:22px 24px;border:1px solid rgba(111,64,39,.14);border-radius:22px;background:linear-gradient(135deg,rgba(255,250,241,.96),rgba(247,231,205,.72));box-shadow:0 14px 40px rgba(91,55,34,.07)}.page-cta-card>div:first-child{display:grid;gap:5px;max-width:720px}.page-cta-kicker{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#a56643}.page-cta-card strong{font-size:clamp(1.05rem,2vw,1.34rem);color:#5f3724}.page-cta-card small{font-size:.9rem;line-height:1.55;color:#775746}.page-cta-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto}.page-cta-primary,.page-cta-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:999px;font:inherit;font-weight:800;text-decoration:none;cursor:pointer;white-space:nowrap}.page-cta-primary{border:1px solid #6f4027;background:#6f4027;color:#fff}.page-cta-secondary{border:1px solid rgba(111,64,39,.22);background:#fffaf1;color:#6f4027}.page-cta-primary:hover,.page-cta-secondary:hover{transform:translateY(-1px)}.floating-cta{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:88;display:grid;gap:8px;padding:8px;border:1px solid rgba(111,64,39,.14);border-radius:20px;background:rgba(255,250,241,.94);box-shadow:0 16px 44px rgba(62,34,20,.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.float-action{appearance:none;-webkit-appearance:none;display:flex;align-items:center;gap:9px;min-width:118px;min-height:44px;padding:8px 11px;border:1px solid transparent;border-radius:14px;background:transparent;color:#6f4027;text-decoration:none;font:inherit;font-weight:800;cursor:pointer;text-align:left;transition:transform .18s ease,background .18s ease,border-color .18s ease}.float-action:hover{transform:translateX(-2px);background:#fff;border-color:rgba(111,64,39,.13)}.float-share{background:#6f4027;color:#fff}.float-share:hover{background:#5e351f;color:#fff}.float-icon{display:grid;place-items:center;width:26px;height:26px;flex:0 0 26px;font-size:1rem}.float-label{font-size:.78rem;letter-spacing:.01em}@media(max-width:900px){.page-cta-card{align-items:flex-start;flex-direction:column;padding:19px}.page-cta-actions{width:100%;flex-wrap:wrap}.page-cta-primary,.page-cta-secondary{flex:1 1 150px}.floating-cta{top:auto;right:10px;bottom:78px;transform:none;display:flex;padding:6px;border-radius:999px}.float-action{min-width:46px;width:46px;min-height:46px;height:46px;padding:0;justify-content:center;border-radius:999px}.float-label{display:none}.float-menu,.float-order{display:none}.float-icon{width:auto;height:auto;flex:auto}}@media(prefers-reduced-motion:reduce){.page-cta-primary,.page-cta-secondary,.float-action{transition:none}}'''
+          if '.floating-cta{' not in c:
+              c+=css_add
+
+          js_add='document.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll("[data-social-share]").forEach(e=>e.addEventListener("click",shareMenu))});'
+          if 'querySelectorAll("[data-social-share]")' not in j:
+              j+=js_add
+
+          index.write_text(h)
+          css.write_text(c)
+          js.write_text(j)
+          PY
+      - name: Validate CTA patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          h=Path('index.html').read_text(); c=Path('site.css').read_text(); j=Path('site.js').read_text()
+          checks={
+            'floating rail':'class="floating-cta"' in h,
+            'share controls':h.count('data-social-share')>=3,
+            'inline CTA 1':'aria-label="Browse and share Bale Bella"' in h,
+            'inline CTA 2':'aria-label="Start a Bale Bella order"' in h,
+            'inline CTA 3':'aria-label="Share Bale Bella Bakehouse"' in h,
+            'fixed CSS':'.floating-cta{position:fixed' in c,
+            'share binding':'querySelectorAll("[data-social-share]")' in j,
+            'author HTML':'Johnpel Quingua <johnpelquingua@gmail.com>' in h,
+            'author JS':'Johnpel Quingua <johnpelquingua@gmail.com>' in j,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          if bad: raise SystemExit('Failed: '+', '.join(bad))
+          print('CTA rail validation passed')
+          PY
+          node --check site.js
+      - name: Commit production changes and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/cta-rail-patch.yml
+          git add index.html site.css site.js .github/workflows/cta-rail-patch.yml
+          git commit -m "Add persistent CTA rail and page conversion prompts"
+          git push
