@@ -1,0 +1,151 @@
+name: Order Form Fix and Production Minify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/order-minify-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+
+      - name: Patch order-type behavior and author metadata
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          author = 'Johnpel Quingua'
+          email = 'johnpelquingua@gmail.com'
+
+          html_path = Path('index.html')
+          html = html_path.read_text(encoding='utf-8')
+          html = re.sub(r'<!--.*?-->', '', html, flags=re.S)
+          html = re.sub(
+              r'<meta\s+name=["\']author["\']\s+content=["\'][^"\']*["\']\s*/?>',
+              f'<meta name="author" content="{author}">',
+              html,
+              count=1,
+              flags=re.I,
+          )
+          if '<meta name="author" content="Johnpel Quingua">' not in html:
+              html = html.replace('<meta name="description"', '<meta name="author" content="Johnpel Quingua"><meta name="description"', 1)
+          html_path.write_text(html, encoding='utf-8')
+
+          css_path = Path('site.css')
+          css = css_path.read_text(encoding='utf-8')
+          css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+          visibility_rule = '[hidden],.is-hidden{display:none!important}'
+          if visibility_rule not in css:
+              css = visibility_rule + css
+          css_path.write_text(css, encoding='utf-8')
+
+          js_path = Path('site.js')
+          js = js_path.read_text(encoding='utf-8')
+          js = re.sub(r'/\*.*?\*/', '', js, flags=re.S)
+          js = re.sub(r'(^|\n)\s*//[^\n]*', r'\1', js)
+          pattern = re.compile(r'function setOrderType\(type\)\{.*?\}function setPayment\(method\)', re.S)
+          replacement = '''function setOrderPanel(id,show){const el=$(id);if(!el)return;el.hidden=!show;el.classList.toggle("is-hidden",!show);el.setAttribute("aria-hidden",String(!show));el.querySelectorAll("input,textarea,select").forEach(field=>{field.disabled=!show})}function setOrderType(type){if(!["personal","gift","corporate"].includes(type))return;orderType=type;document.querySelectorAll("[data-order-type]").forEach(b=>{const active=b.dataset.orderType===type;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});const isGift=type==="gift",isCorporate=type==="corporate";setOrderPanel("giftFields",isGift);setOrderPanel("corporateFields",isCorporate);const recipient=$("recipientName"),company=$("companyName"),guests=$("guestCount");if(recipient)recipient.required=isGift;if(company)company.required=isCorporate;if(guests)guests.required=isCorporate;["recipientName","companyName","guestCount"].forEach(clearError)}function setPayment(method)'''
+          js, count = pattern.subn(replacement, js, count=1)
+          if count != 1:
+              raise SystemExit('Could not safely locate setOrderType for replacement')
+          js_path.write_text(js, encoding='utf-8')
+
+      - name: Minify production HTML CSS and JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes terser@5.44.0 site.js --compress --mangle --comments false --output /tmp/site.js
+          npx --yes clean-css-cli@5.6.3 -O2 -o /tmp/site.css site.css
+          npx --yes html-minifier-terser@7.2.0 index.html \
+            --collapse-whitespace \
+            --conservative-collapse \
+            --remove-comments \
+            --remove-redundant-attributes \
+            --remove-script-type-attributes \
+            --remove-style-link-type-attributes \
+            --use-short-doctype \
+            -o /tmp/index.html
+
+          printf '%s\n' '<!-- Author: Johnpel Quingua <johnpelquingua@gmail.com> -->' > index.html
+          cat /tmp/index.html >> index.html
+          printf '%s\n' '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */' > site.css
+          cat /tmp/site.css >> site.css
+          printf '%s\n' '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */' > site.js
+          cat /tmp/site.js >> site.js
+
+      - name: Verify order type switching in a browser DOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/order-test.cjs <<'NODE'
+          const fs=require('fs');
+          const {JSDOM}=require('jsdom');
+          const dom=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://example.com/',runScripts:'outside-only',pretendToBeVisual:true});
+          const w=dom.window;
+          w.requestAnimationFrame=()=>0;
+          w.cancelAnimationFrame=()=>{};
+          w.confirm=()=>true;
+          w.open=()=>({opener:null});
+          w.eval(fs.readFileSync('site.js','utf8'));
+          w.document.dispatchEvent(new w.Event('DOMContentLoaded',{bubbles:true}));
+          const q=s=>w.document.querySelector(s);
+          const gift=()=>w.document.getElementById('giftFields');
+          const corp=()=>w.document.getElementById('corporateFields');
+          const click=s=>q(s).dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+          const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
+          assert(gift().hidden && corp().hidden,'Personal must hide Gift and Corporate fields');
+          click('[data-order-type="gift"]');
+          assert(!gift().hidden && corp().hidden,'Gift must show only Gift fields');
+          assert(w.document.getElementById('recipientName').required,'Gift recipient must become required');
+          click('[data-order-type="corporate"]');
+          assert(gift().hidden && !corp().hidden,'Corporate must show only Corporate fields');
+          assert(w.document.getElementById('companyName').required && w.document.getElementById('guestCount').required,'Corporate required fields not activated');
+          click('[data-order-type="personal"]');
+          assert(gift().hidden && corp().hidden,'Returning to Personal must hide conditional fields');
+          console.log('Order type switching test passed.');
+          NODE
+          npx --yes -p jsdom@26.1.0 node /tmp/order-test.cjs
+
+      - name: Validate production output
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check site.js
+          grep -q '<meta name="author" content="Johnpel Quingua">' index.html
+          grep -q '\[hidden\],.is-hidden{display:none!important}' site.css
+          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' index.html
+          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' site.css
+          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' site.js
+          if grep -q 'SEO-LOCAL-V1\|LLMSTXT-DISCOVERY-V2\|BALE-BELLA-STORY-V1\|Static-site clickjacking fallback\|Defensive limits for public form fields\|Local SEO and location\|Bale Bella origin story' index.html site.css site.js; then
+            echo 'Legacy source comments remain.'
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          for name in ('index.html','site.css','site.js'):
+              text=Path(name).read_text(encoding='utf-8')
+              print(f'{name}: {len(text):,} bytes; {text.count(chr(10))+1} lines')
+          PY
+
+      - name: Commit production files and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/order-minify-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html site.css site.js .github/workflows/order-minify-patch.yml
+          git commit -m 'Fix dynamic order fields and minify production source'
+          git push origin HEAD:main
