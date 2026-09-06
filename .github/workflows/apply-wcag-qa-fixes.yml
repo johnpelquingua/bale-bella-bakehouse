@@ -1,0 +1,184 @@
+name: Apply WCAG QA Fixes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-wcag-qa-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Apply functional and accessibility remediations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 exact match, found {count}')
+              return text.replace(old, new, 1)
+
+          # ---------- index.html ----------
+          p = Path('index.html')
+          h = p.read_text(encoding='utf-8')
+          h = replace_once(h, '<a class="skip-link" href="#menu">Skip to menu</a>', '<a class="skip-link" href="#top">Skip to main content</a>', 'skip link')
+          h = replace_once(h, '<main id="top">', '<main id="top" tabindex="-1">', 'main focus target')
+          h = replace_once(h, '</nav></div></header> <main id="top" tabindex="-1">', '</nav></div><div class="soft-launch-banner" role="status">SOFT LAUNCH ✦ Limited pre-orders are open while we fine-tune our bakes, packaging and ordering experience.</div></header> <main id="top" tabindex="-1">', 'soft launch banner')
+          h = replace_once(h, '<span class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Now taking pre-orders</span>', '<span class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Soft launch · Limited pre-orders open</span>', 'hero preorder status')
+          hero_old = '<p class="hero-copy">A home-based bakery in Dela Paz Sur, City of San Fernando, Pampanga serving small-batch cookies, fudgy brownies, banana loaves, Basque cheesecake and giftable dessert boxes.</p>'
+          hero_new = hero_old + '<p class="hero-launch-note">We’re currently in soft launch while we fine-tune our bakes, packaging and ordering experience. Limited pre-orders are open and confirmed through WhatsApp.</p>'
+          h = replace_once(h, hero_old, hero_new, 'hero launch note')
+          h = replace_once(h, '<div class="filters" id="filters" aria-label="Filter menu by category"></div><div class="menu-grid" id="menuGrid" aria-live="polite"></div>', '<div class="filters" id="filters" aria-label="Filter menu by category"></div><p class="sr-only" id="menuStatus" role="status" aria-live="polite"></p><div class="menu-grid" id="menuGrid"></div>', 'menu live region')
+          h = replace_once(h, '<button class="motion-btn" id="motionBtn" type="button" aria-pressed="true" title="Toggle animations">', '<button class="motion-btn" id="motionBtn" type="button" aria-pressed="true" aria-label="Turn animations off" title="Toggle animations">', 'motion control')
+
+          h = replace_once(h, '<div class="panel reveal"><h3>Order details</h3><div class="form">', '<div class="panel reveal"><h3 id="orderDetailsTitle">Order details</h3><form id="orderForm" class="form" novalidate aria-labelledby="orderDetailsTitle">', 'semantic order form')
+          h = replace_once(h, '<div class="field full"><label>Order type</label><div class="segments three">', '<div class="field full"><span class="group-label" id="orderTypeLabel">Order type</span><div class="segments three" role="group" aria-labelledby="orderTypeLabel">', 'order type group')
+          h = replace_once(h, '<div class="field full"><label>Fulfillment</label><div class="segments">', '<div class="field full"><span class="group-label" id="fulfillmentLabel">Fulfillment</span><div class="segments" role="group" aria-labelledby="fulfillmentLabel">', 'fulfillment group')
+          h = replace_once(h, '<div class="field full"><label>Preferred payment</label><div class="payment-options">', '<div class="field full"><span class="group-label" id="paymentLabel">Preferred payment</span><div class="payment-options" role="group" aria-labelledby="paymentLabel">', 'payment group')
+
+          h = replace_once(h, '<input id="customerName" autocomplete="name" placeholder="Your name">', '<input id="customerName" autocomplete="name" placeholder="Your name" required aria-required="true" aria-describedby="customerNameError">', 'name semantics')
+          h = replace_once(h, '<input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567">', '<input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567" required aria-required="true" aria-describedby="customerPhoneError">', 'phone semantics')
+          h = replace_once(h, '<input id="recipientName" placeholder="Who is receiving it?">', '<input id="recipientName" placeholder="Who is receiving it?" aria-describedby="recipientNameError">', 'recipient semantics')
+          h = replace_once(h, '<input id="companyName" placeholder="Company name">', '<input id="companyName" placeholder="Company name" aria-describedby="companyNameError">', 'company semantics')
+          h = replace_once(h, '<input id="guestCount" type="number" min="10" step="1" placeholder="e.g. 50">', '<input id="guestCount" type="number" min="10" step="1" placeholder="e.g. 50" aria-describedby="guestCountError">', 'guest semantics')
+          h = replace_once(h, '<input id="orderDate" type="date">', '<input id="orderDate" type="date" required aria-required="true" aria-describedby="orderDateError leadHint">', 'date semantics')
+          h = replace_once(h, '<input id="address" autocomplete="street-address" placeholder="Subdivision / barangay / landmark">', '<input id="address" autocomplete="street-address" placeholder="Subdivision / barangay / landmark" aria-describedby="addressError">', 'address semantics')
+
+          for fid in ['customerNameError','customerPhoneError','recipientNameError','companyNameError','guestCountError','orderDateError','addressError']:
+              h = replace_once(h, f'<small class="field-error" id="{fid}"></small>', f'<small class="field-error" id="{fid}" role="alert"></small>', f'{fid} alert')
+
+          for icon in ['G','₱','⌂']:
+              h = replace_once(h, f'<span class="payment-icon">{icon}</span>', f'<span class="payment-icon" aria-hidden="true">{icon}</span>', f'payment icon {icon}')
+          for icon in ['🛍️','💬','📲']:
+              h = replace_once(h, f'<div class="how-icon">{icon}</div>', f'<div class="how-icon" aria-hidden="true">{icon}</div>', f'how icon {icon}')
+
+          h = replace_once(h, '</div></div><aside class="panel cart-panel reveal" aria-label="Order summary">', '</form></div><aside class="panel cart-panel reveal" aria-label="Order summary">', 'form closing')
+          h = replace_once(h, '<button type="button" class="checkout" id="sendBtn" disabled="disabled">', '<button type="submit" form="orderForm" class="checkout" id="sendBtn" disabled="disabled">', 'submit button')
+          h = replace_once(h, '<div class="toast" id="toast" role="status" aria-live="polite">Added</div>', '<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>', 'toast initial state')
+          copy_old = '<dialog id="copyDialog" class="copy-dialog"><form method="dialog"><div class="dialog-head"><b>Copy your order</b><button aria-label="Close">×</button></div><p>Your browser blocked automatic copying. Select the text below and copy it manually.</p><textarea id="manualCopyText" readonly="readonly"></textarea><button class="primary dialog-close">Done</button></form></dialog>'
+          copy_new = '<dialog id="copyDialog" class="copy-dialog" aria-labelledby="copyDialogTitle" aria-describedby="copyDialogDesc"><form method="dialog"><div class="dialog-head"><b id="copyDialogTitle">Copy your order</b><button aria-label="Close copy dialog">×</button></div><p id="copyDialogDesc">Your browser blocked automatic copying. Select the text below and copy it manually.</p><label class="sr-only" for="manualCopyText">Order text to copy</label><textarea id="manualCopyText" readonly="readonly"></textarea><button class="primary dialog-close">Done</button></form></dialog>'
+          h = replace_once(h, copy_old, copy_new, 'copy dialog labels')
+
+          accessibility = '<section id="accessibility" class="accessibility-section" aria-labelledby="accessibility-title"><div class="wrap"><div class="accessibility-card"><div><span class="eyebrow">Accessibility</span><h2 id="accessibility-title">Bale Bella is for everyone.</h2><p>We aim to support WCAG 2.2 Level AA, including keyboard navigation, screen readers, zoom, clear focus states and reduced-motion preferences. If you encounter an accessibility barrier while browsing or ordering, please message Bale Bella on WhatsApp at <a href="https://wa.me/639171344775" target="_blank" rel="noopener noreferrer">0917 134 4775</a> and we will provide an accessible ordering alternative.</p></div></div></div></section> '
+          h = replace_once(h, ' </main> <section class="authenticity"', ' ' + accessibility + '</main> <section class="authenticity"', 'accessibility statement')
+          p.write_text(h, encoding='utf-8')
+
+          # ---------- site.js ----------
+          p = Path('site.js')
+          j = p.read_text(encoding='utf-8')
+          j = replace_once(j, '"use strict";try{', '"use strict";document.documentElement.classList.add("js");try{', 'progressive enhancement js class')
+
+          new_render_menu = '''function renderMenu(){const e="All"===activeCategory?PRODUCTS:PRODUCTS.filter(e=>e.category===activeCategory);$("menuGrid").innerHTML=e.map(e=>{const t=e.variants[0],a=e.available?`Add ${e.name} to your order`:`${e.name} is unavailable`;return`<article class="card reveal visible ${e.available?"":"sold-out"}"><div class="visual" aria-hidden="true"><span class="tag">${e.tag}</span><span class="stock-badge ${e.available?"":"sold"}">${e.available?"Available":"Sold out"}</span><span class="food-emoji">${e.emoji}</span></div><div class="card-body"><span class="sr-only">Status: ${e.available?"Available":"Sold out"}. ${e.tag}.</span><h3>${e.name}</h3><p>${e.desc}</p><div class="lead-time">⏱ ${e.leadDays} day${e.leadDays>1?"s":""} minimum lead time</div>${e.variants.length>1?`<select class="variant-select" data-variant-select="${e.id}" aria-label="Choose size for ${e.name}">${e.variants.map((e,t)=>`<option value="${t}">${e.label} · ${money(e.price)}</option>`).join("")}</select>`:""}<div class="card-bottom"><span class="price" id="price-${e.id}">${money(t.price)}</span><button type="button" class="add-btn" data-add="${e.id}" aria-label="${a}" ${e.available?"":"disabled"}>${e.available?"+ Add":"Unavailable"}</button></div></div></article>`}).join("");const t=$("menuStatus");t&&(t.textContent=`${e.length} menu item${1===e.length?"":"s"} shown${"All"===activeCategory?".":` in ${activeCategory}.`}`)}'''
+          j, n = re.subn(r'function renderMenu\(\)\{.*?\}function getCartItems', new_render_menu + 'function getCartItems', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'renderMenu replacement count {n}')
+
+          new_render_cart = '''function renderCart(){const e=getCartItems();$("cartList").innerHTML=e.length?e.map(e=>`<div class="cart-item"><div><b>${e.name}</b><div class="meta">${e.variant.label} · ${money(e.variant.price)} each · ${money(e.variant.price*e.qty)}</div></div><div class="qty" role="group" aria-label="Quantity for ${e.name}"><button type="button" data-cart-key="${e.cartKey}" data-delta="-1" aria-label="Decrease ${e.name} quantity">−</button><b aria-label="Quantity ${e.qty}">${e.qty}</b><button type="button" data-cart-key="${e.cartKey}" data-delta="1" aria-label="Increase ${e.name} quantity">+</button></div></div>`).join(""):'<div class="empty"><span class="empty-emoji" aria-hidden="true">🍪</span>Your box is empty.<br><small>Pick something sweet above.</small></div>',$("subtotal").textContent=money(subtotal()),$("total").textContent=money(subtotal()),$("delivery").textContent="pickup"===fulfillment?"Pickup":"Quoted separately",$("paymentSummary").textContent="GCash"===paymentMethod?"GCash after confirmation":paymentMethod,$("mobileTotal").textContent=money(subtotal()),$("mobileCount").textContent=totalCount(),$("cartCount").textContent=totalCount(),$("sendBtn").disabled=!e.length,$("clearCartBtn").disabled=!e.length,updateMinimumDate()}'''
+          j, n = re.subn(r'function renderCart\(\)\{.*?\}function addToCart', new_render_cart + 'function addToCart', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'renderCart replacement count {n}')
+
+          new_fulfill = '''function setFulfillment(e){fulfillment=e,document.querySelectorAll("[data-mode]").forEach(t=>{const a=t.dataset.mode===e;t.classList.toggle("active",a),t.setAttribute("aria-pressed",String(a))});const t="delivery"===e,a=$("address");$("addressField").hidden=!t,$("deliveryHint").classList.toggle("show",t),a&&(a.required=t,a.disabled=!t,a.setAttribute("aria-required",String(t))),clearError("address"),renderCart()}'''
+          j, n = re.subn(r'function setFulfillment\(e\)\{.*?\}function setOrderPanel', new_fulfill + 'function setOrderPanel', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'setFulfillment replacement count {n}')
+
+          new_order_type = '''function setOrderType(e){if(!["personal","gift","corporate"].includes(e))return;orderType=e,document.querySelectorAll("[data-order-type]").forEach(t=>{const a=t.dataset.orderType===e;t.classList.toggle("active",a),t.setAttribute("aria-pressed",String(a))});const t="gift"===e,a="corporate"===e;setOrderPanel("giftFields",t),setOrderPanel("corporateFields",a);const r=$("recipientName"),n=$("companyName"),o=$("guestCount");r&&(r.required=t,r.setAttribute("aria-required",String(t))),n&&(n.required=a,n.setAttribute("aria-required",String(a))),o&&(o.required=a,o.setAttribute("aria-required",String(a))),["recipientName","companyName","guestCount"].forEach(clearError)}'''
+          j, n = re.subn(r'function setOrderType\(e\)\{.*?\}function setPayment', new_order_type + 'function setPayment', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'setOrderType replacement count {n}')
+
+          new_errors = '''function setError(e,t){const a=$(e),r=$(`${e}Error`);a&&(a.classList.add("invalid"),a.setAttribute("aria-invalid","true"),r&&a.setAttribute("aria-errormessage",r.id)),r&&(r.textContent=t)}function clearError(e){const t=$(e),a=$(`${e}Error`);t&&(t.classList.remove("invalid"),t.removeAttribute("aria-invalid"),t.removeAttribute("aria-errormessage")),a&&(a.textContent="")}function clearAllErrors(){["customerName","customerPhone","orderDate","address","recipientName","companyName","guestCount"].forEach(clearError)}function scrollToElement(e){e&&e.scrollIntoView({behavior:motionEnabled?"smooth":"auto",block:"start"})}'''
+          j, n = re.subn(r'function setError\(e,t\)\{.*?\}function clearError\(e\)\{.*?\}function clearAllErrors\(\)\{.*?\}', new_errors, j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'error helpers replacement count {n}')
+
+          new_validate = '''function validateOrder(){clearAllErrors();let e=null;const t=$("customerName").value.trim(),a=normalizedPhone($("customerPhone").value.trim()),r=$("orderDate").value,n=$("orderDate").min||"",o=$("address").value.trim();if(!getCartItems().length)return toast("Add at least one item first."),scrollToElement($("menu")),!1;t.length<2&&(setError("customerName","Please enter your name."),e=e||$("customerName")),/^(?:\\+?63|0)9\\d{9}$/.test(a)||(setError("customerPhone","Use a valid PH mobile number."),e=e||$("customerPhone")),(!r||n&&r<n)&&(setError("orderDate",n?`Please choose ${n} or a later date.`:"Please select a date."),e=e||$("orderDate")),"delivery"===fulfillment&&o.length<5&&(setError("address","Add a delivery address or landmark."),e=e||$("address")),"gift"===orderType&&$("recipientName").value.trim().length<2&&(setError("recipientName","Add the recipient name."),e=e||$("recipientName")),"corporate"===orderType&&($("companyName").value.trim().length<2&&(setError("companyName","Add the company / organization."),e=e||$("companyName")),Number($("guestCount").value)<10&&(setError("guestCount","Enter at least 10 for a corporate request."),e=e||$("guestCount")));return!e||(e.focus(),toast("Please check the highlighted details."),!1)}'''
+          j, n = re.subn(r'function validateOrder\(\)\{.*?\}function makeOrderReference', new_validate + 'function makeOrderReference', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'validateOrder replacement count {n}')
+
+          # Remove the older duplicate shareMenu implementation; retain the later dialog implementation.
+          j, n = re.subn(r'async function shareMenu\(\)\{.*?\}function toast', 'function toast', j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'duplicate shareMenu removal count {n}')
+
+          new_motion = '''function setMotion(e){motionEnabled=e,document.body.classList.toggle("motion-off",!e),document.documentElement.style.scrollBehavior=e?"smooth":"auto";const t=$("motionBtn");t.setAttribute("aria-pressed",String(e)),t.setAttribute("aria-label",e?"Turn animations off":"Turn animations on"),t.querySelector(".motion-label").textContent=e?"Motion On":"Motion Off";try{localStorage.setItem("bb_motion",e?"on":"off")}catch{}}function initMotion(){let e=null;try{e=localStorage.getItem("bb_motion")}catch{}const t="function"==typeof matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;setMotion(null===e?!t:"off"!==e)}'''
+          j, n = re.subn(r'function setMotion\(e\)\{.*?\}function initMotion\(\)\{.*?\}', new_motion, j, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'motion replacement count {n}')
+
+          j = replace_once(j, '$("sendBtn").addEventListener("click",sendOrder)', '$("orderForm").addEventListener("submit",e=>{e.preventDefault(),sendOrder()})', 'form submit binding')
+          j = replace_once(j, '$("mobileCartBtn").addEventListener("click",()=>$("order").scrollIntoView({behavior:"smooth"}))', '$("mobileCartBtn").addEventListener("click",()=>scrollToElement($("order")))', 'mobile scroll')
+          p.write_text(j, encoding='utf-8')
+
+          # ---------- site.css ----------
+          p = Path('site.css')
+          c = p.read_text(encoding='utf-8')
+          c = c.replace('/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */\n/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */', '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */', 1)
+          c = replace_once(c, 'html{scroll-behavior:smooth}', 'html{scroll-behavior:smooth;scroll-padding-top:126px}', 'scroll padding')
+          c = replace_once(c, 'label{font-size:.74rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:var(--cocoa)}', 'label,.group-label{font-size:.74rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:var(--cocoa)}', 'group label styling')
+          c = replace_once(c, '.segments{display:grid;grid-template-columns:1fr 1fr;background:#f6efe6;border-radius:14px;padding:4px}', '.segments{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#f6efe6;border-radius:14px;padding:4px}', 'segment spacing')
+          c = replace_once(c, '.seg{border:0;background:0 0;border-radius:11px;padding:10px;font-weight:900;color:var(--muted);transition:.18s}', '.seg{border:0;background:0 0;border-radius:11px;padding:10px;min-height:44px;min-width:44px;font-weight:900;color:var(--muted);transition:.18s}', 'segment target size')
+          c = replace_once(c, '.filter{border:1px solid var(--line);background:rgba(255,253,249,.9);color:var(--muted);font-weight:850;border-radius:999px;padding:9px 14px;transition:.2s}', '.filter{border:1px solid var(--line);background:rgba(255,253,249,.9);color:var(--muted);font-weight:850;border-radius:999px;padding:9px 14px;min-height:44px;transition:.2s}', 'filter target size')
+          c = replace_once(c, '.add-btn{position:relative;overflow:hidden;border:0;background:var(--butter-soft);color:var(--cocoa);border-radius:999px;padding:9px 13px;font-weight:900;transition:transform .18s,background .18s}', '.add-btn{position:relative;overflow:hidden;border:0;background:var(--butter-soft);color:var(--cocoa);border-radius:999px;padding:9px 13px;min-height:44px;font-weight:900;transition:transform .18s,background .18s}', 'add target size')
+          c = replace_once(c, '.text-btn{border:0;background:0 0;color:var(--muted);font-weight:800;padding:4px 0}', '.text-btn{border:0;background:0 0;color:var(--muted);font-weight:800;padding:8px;min-height:44px;min-width:44px}', 'clear target size')
+          c = replace_once(c, '.qty button{width:29px;height:29px;border-radius:50%;border:1px solid var(--line);background:#fff;font-weight:900;color:var(--cocoa);transition:.15s}', '.qty button{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:1px solid var(--line);background:#fff;font-weight:900;color:var(--cocoa);transition:.15s}', 'quantity targets')
+          c = replace_once(c, '.dialog-head button{border:0;background:0 0;font-size:1.5rem;color:var(--muted)}', '.dialog-head button{border:0;background:0 0;font-size:1.5rem;color:var(--muted);min-width:44px;min-height:44px;border-radius:50%}', 'dialog close target')
+          c = replace_once(c, '.share-close{border:1px solid var(--line);background:#fff;width:38px;height:38px;border-radius:50%;font-size:1.35rem;color:var(--cocoa)}', '.share-close{border:1px solid var(--line);background:#fff;width:44px;height:44px;flex:0 0 44px;border-radius:50%;font-size:1.35rem;color:var(--cocoa)}', 'share close target')
+          c = replace_once(c, '.reveal{opacity:0;transform:translateY(20px);transition:opacity .62s,transform .62s}.reveal.visible{opacity:1;transform:none}', '.reveal{opacity:1;transform:none;transition:opacity .62s,transform .62s}.js .reveal:not(.visible){opacity:0;transform:translateY(20px)}.reveal.visible{opacity:1;transform:none}', 'progressive reveal')
+          c = replace_once(c, 'body.motion-off *,body.motion-off ::after,body.motion-off ::before{animation:none!important;transition-duration:NaNs!important}', 'body.motion-off *,body.motion-off ::after,body.motion-off ::before{animation:none!important;transition-duration:0s!important;scroll-behavior:auto!important}', 'motion off bug')
+          c = replace_once(c, ':focus-visible{outline:rgba(198,141,84,.48) solid 3px;outline-offset:3px}', ':focus-visible{outline:3px solid #6f4027;outline-offset:3px}', 'focus indicator')
+
+          # Remove CSS-generated meaningful soft-launch text and replace it with styles for real DOM content.
+          c, n = re.subn(r'header::after\{content:"SOFT LAUNCH.*?\}', '.soft-launch-banner{display:block;width:100%;padding:9px 18px;text-align:center;background:linear-gradient(90deg,#6f4027,#8f6042,#6f4027);background-size:200% 100%;color:#fff8ec;font-size:.76rem;font-weight:850;letter-spacing:.025em;line-height:1.45;box-shadow:0 7px 18px rgba(73,49,31,.08);animation:8s ease-in-out infinite softLaunchGlow}', c, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'soft launch header CSS replacement count {n}')
+          c, n = re.subn(r'\.hero \.eyebrow\{font-size:0;background:#fff4d9;border-color:#edcf8d\}\.hero \.eyebrow \.status-dot\{display:none\}\.hero \.eyebrow::before\{content:"✦";.*?\}\.hero \.eyebrow::after\{content:"Soft launch · First look only · Full orders opening soon";.*?\}\.hero-copy::after\{content:" We’re currently in soft launch while we fine-tune our bakes, packaging and ordering experience\. We’ll be accepting orders in full very soon\.";.*?\}', '.hero .eyebrow{background:#fff4d9;border-color:#edcf8d}.hero-launch-note{max-width:650px;margin:10px 0 0;padding:11px 13px;border-left:3px solid var(--butter);border-radius:0 12px 12px 0;background:#fff8e9;color:var(--cocoa);font-size:.88rem;line-height:1.6}', c, count=1, flags=re.S)
+          if n != 1: raise SystemExit(f'hero generated-content CSS replacement count {n}')
+          c = c.replace('body.motion-off .hero .eyebrow::before,body.motion-off header::after{animation:none!important}', 'body.motion-off .soft-launch-banner{animation:none!important}', 1)
+          c = c.replace('@media(max-width:650px){header::after{font-size:.69rem;padding:8px 13px}.hero .eyebrow{max-width:100%;line-height:1.35}.hero .eyebrow::after{font-size:.72rem}}', '@media(max-width:650px){.soft-launch-banner{font-size:.69rem;padding:8px 13px}.hero .eyebrow{max-width:100%;line-height:1.35}}', 1)
+
+          # Replace the narrow reduced-motion rule with a robust fallback for no-JS users; JS honors and can explicitly override the OS preference.
+          c = replace_once(c, '@media(prefers-reduced-motion:reduce){.page-cta-primary,.page-cta-secondary,.float-action{transition:none}}', '@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}html:not(.js) *,html:not(.js) *::before,html:not(.js) *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}', 'reduced motion fallback')
+
+          extra = '.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}main[id],section[id]{scroll-margin-top:126px}.accessibility-section{padding:18px 0 38px}.accessibility-card{border:1px solid var(--line);background:linear-gradient(145deg,#fffdf9,#fff8ec);border-radius:22px;padding:22px 24px;box-shadow:var(--shadow-sm)}.accessibility-card h2{margin:10px 0 8px;font-size:clamp(1.8rem,3vw,2.5rem)}.accessibility-card p{margin:0;color:var(--muted);line-height:1.72;max-width:900px}.accessibility-card a{color:var(--cocoa);font-weight:900}@media(max-width:650px){html{scroll-padding-bottom:100px}.accessibility-card{padding:18px}}'
+          c += extra
+          p.write_text(c, encoding='utf-8')
+
+          # Final source assertions.
+          h = Path('index.html').read_text(encoding='utf-8')
+          j = Path('site.js').read_text(encoding='utf-8')
+          c = Path('site.css').read_text(encoding='utf-8')
+          assertions = [
+              ('index skip main', 'href="#top">Skip to main content' in h),
+              ('form', 'id="orderForm"' in h),
+              ('menu status', 'id="menuStatus"' in h),
+              ('accessibility statement', 'id="accessibility"' in h),
+              ('no generated soft launch text', 'Full ordering opens soon' not in c),
+              ('no invalid NaNs', 'NaNs' not in c),
+              ('reduced motion', 'prefers-reduced-motion:reduce' in c),
+              ('specific add name', 'aria-label="${a}"' in j),
+              ('date min validation', 'Please choose ${n} or a later date.' in j),
+              ('single shareMenu', j.count('function shareMenu()') == 1),
+          ]
+          bad = [name for name, ok in assertions if not ok]
+          if bad: raise SystemExit('Assertions failed: ' + ', '.join(bad))
+          print('WCAG/QA source remediations applied and assertions passed.')
+          PY
+          node --check site.js
+
+      - name: Commit fixes and remove one-time workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/apply-wcag-qa-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html site.js site.css .github/workflows/apply-wcag-qa-fixes.yml
+          git commit -m "Improve WCAG 2.2 accessibility and order QA"
+          git push
