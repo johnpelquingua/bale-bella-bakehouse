@@ -1,0 +1,43 @@
+name: Repair WCAG Remediation Workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-wcag-workflow.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Fix Python regex replacement handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/apply-wcag-qa-fixes.yml')
+          s = p.read_text(encoding='utf-8')
+          old = ", new_validate + 'function makeOrderReference', j, count=1, flags=re.S)"
+          new = ", lambda m: new_validate + 'function makeOrderReference', j, count=1, flags=re.S)"
+          if s.count(old) != 1:
+              raise SystemExit(f'Expected exactly one validate replacement target, found {s.count(old)}')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit repair and remove temporary repair workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/repair-wcag-workflow.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/apply-wcag-qa-fixes.yml .github/workflows/repair-wcag-workflow.yml
+          git commit -m "Fix WCAG remediation runner"
+          git push
