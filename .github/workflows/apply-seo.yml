@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'seo_patch.py'
+      - '.github/workflows/apply-seo.yml'
   workflow_dispatch:
 
 permissions:
