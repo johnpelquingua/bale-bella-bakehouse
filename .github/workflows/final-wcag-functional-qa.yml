@@ -1,0 +1,176 @@
+name: Final WCAG 2.2 AA and Functional QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/final-wcag-functional-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install browser QA tools
+        run: |
+          mkdir -p /tmp/bb-final-qa && cd /tmp/bb-final-qa
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+      - name: Run browser, keyboard, order-flow and accessibility checks
+        env:
+          NODE_PATH: /tmp/bb-final-qa/node_modules
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/bb-server.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          sleep 1
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const AxeBuilder = require('@axe-core/playwright').default;
+          const failures=[];
+          const pass=(ok,msg)=>{console.log(`${ok?'PASS':'FAIL'}: ${msg}`);if(!ok)failures.push(msg)};
+          const BASE='http://127.0.0.1:4173/';
+          async function runAxe(page,label){
+            const r=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']).analyze();
+            pass(r.violations.length===0,`${label}: axe WCAG 2.2 AA/best-practice has no violations`);
+            for(const v of r.violations){
+              console.log(`  A11Y [${v.impact}] ${v.id}: ${v.help}`);
+              for(const n of v.nodes){console.log(`    target=${n.target.join(' ')} | ${String(n.failureSummary||'').replace(/\n/g,' ')}`)}
+            }
+          }
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              for(const vp of [{n:'desktop',w:1440,h:1000},{n:'mobile',w:390,h:844},{n:'narrow-320',w:320,h:900}]){
+                console.log(`\n=== ${vp.n} ===`);
+                const ctx=await browser.newContext({viewport:{width:vp.w,height:vp.h}});
+                const page=await ctx.newPage();
+                const jsErrors=[]; page.on('pageerror',e=>jsErrors.push(e.message));
+                await page.addInitScript(()=>{
+                  window.__openedUrl='';
+                  window.open=url=>{window.__openedUrl=String(url||'');return{opener:null}};
+                  window.confirm=()=>true;
+                });
+                await page.goto(BASE,{waitUntil:'domcontentloaded'});
+                await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});
+                await page.reload({waitUntil:'domcontentloaded'});
+                await page.waitForSelector('#menuGrid .card');
+
+                pass(jsErrors.length===0,`${vp.n}: no uncaught JavaScript errors`);
+                pass(await page.locator('h1').count()===1,`${vp.n}: exactly one H1`);
+                pass(await page.locator('main').count()===1,`${vp.n}: one main landmark`);
+                pass(await page.locator('img:not([alt])').count()===0,`${vp.n}: all images have alt attributes`);
+                pass(await page.locator('iframe:not([title])').count()===0,`${vp.n}: all iframes have titles`);
+                pass(await page.locator('input:not([type="hidden"]):not([aria-label]):not([aria-labelledby])').evaluateAll(els=>els.every(el=>!!document.querySelector(`label[for="${el.id}"]`)||!!el.closest('[role="group"]'))),`${vp.n}: form inputs have programmatic labels`);
+
+                await page.locator('body').focus(); await page.keyboard.press('Tab');
+                pass(String(await page.evaluate(()=>document.activeElement?.className||'')).includes('skip-link'),`${vp.n}: first Tab lands on skip link`);
+                pass(await page.locator('.skip-link').getAttribute('href')==='#top',`${vp.n}: skip link targets main`);
+                await page.locator('.skip-link').press('Enter');
+                pass(await page.evaluate(()=>location.hash)==='#top',`${vp.n}: skip link activates`);
+
+                pass(await page.locator('#menuGrid .card').count()===9,`${vp.n}: all 9 products render`);
+                await page.getByRole('button',{name:'Cookies',exact:true}).click();
+                pass(await page.locator('#menuGrid .card').count()===4,`${vp.n}: menu category filter works`);
+                pass((await page.locator('#menuStatus').textContent()).includes('4'),`${vp.n}: filter result count is announced`);
+                await page.getByRole('button',{name:'All',exact:true}).click();
+
+                const select=page.locator('[data-variant-select="mayumu"]');
+                await select.selectOption('1');
+                pass((await page.locator('#price-mayumu').textContent()).trim()==='₱360',`${vp.n}: variant price updates`);
+                await select.selectOption('0');
+                const add=page.locator('[data-add="mayumu"]');
+                pass((await add.getAttribute('aria-label')||'').toLowerCase().includes('mayumu'),`${vp.n}: Add button has product-specific accessible name`);
+                await add.click();
+                pass((await page.locator('#cartCount').textContent()).trim()==='1',`${vp.n}: cart count increments`);
+                pass((await page.locator('#subtotal').textContent()).trim()==='₱95',`${vp.n}: cart subtotal correct`);
+                pass(Boolean(await page.evaluate(()=>localStorage.getItem('bb_cart'))),`${vp.n}: cart persists locally`);
+                await page.reload({waitUntil:'domcontentloaded'}); await page.waitForSelector('#menuGrid .card');
+                pass((await page.locator('#cartCount').textContent()).trim()==='1',`${vp.n}: cart restores after reload`);
+                const inc=page.locator('#cartList [data-delta="1"]').first();
+                pass((await inc.getAttribute('aria-label')||'').toLowerCase().includes('increase'),`${vp.n}: quantity increment is named`);
+                await inc.click(); pass((await page.locator('#subtotal').textContent()).trim()==='₱190',`${vp.n}: quantity increment recalculates`);
+                await page.locator('#cartList [data-delta="-1"]').first().click();
+                pass((await page.locator('#subtotal').textContent()).trim()==='₱95',`${vp.n}: quantity decrement recalculates`);
+
+                await page.locator('[data-add="banana"]').click();
+                pass((await page.locator('#leadHint').textContent()).includes('2 days'),`${vp.n}: longest product lead time updates date rule`);
+                await page.locator('#cartList [data-cart-key^="banana::"][data-delta="-1"]').first().click();
+                await runAxe(page,`${vp.n}/initial-order`);
+
+                await page.locator('[data-mode="delivery"]').click();
+                pass(!(await page.locator('#addressField').evaluate(el=>el.hidden)),`${vp.n}: Delivery reveals address`);
+                pass(await page.locator('#address').evaluate(el=>el.required),`${vp.n}: Delivery address becomes required`);
+                pass(await page.locator('#address').getAttribute('aria-required')==='true',`${vp.n}: required delivery state exposed`);
+                await page.locator('[data-order-type="gift"]').click();
+                pass(!(await page.locator('#giftFields').evaluate(el=>el.hidden)),`${vp.n}: Gift reveals recipient fields`);
+                pass(await page.locator('#recipientName').evaluate(el=>el.required),`${vp.n}: recipient becomes required`);
+                await runAxe(page,`${vp.n}/delivery-gift`);
+
+                await page.locator('[data-order-type="corporate"]').click();
+                pass(await page.locator('#companyName').evaluate(el=>el.required),`${vp.n}: company required in corporate mode`);
+                pass(await page.locator('#guestCount').evaluate(el=>el.required),`${vp.n}: quantity required in corporate mode`);
+                await page.locator('#customerName').fill('QA Tester');
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#address').fill('QA Address, San Fernando');
+                await page.locator('#companyName').fill('QA Company');
+                await page.locator('#guestCount').fill('9');
+                await page.locator('#sendBtn').click();
+                pass(await page.locator('#guestCount').getAttribute('aria-invalid')==='true',`${vp.n}: corporate minimum quantity validation works`);
+                await page.locator('[data-order-type="personal"]').click();
+                await page.locator('[data-mode="pickup"]').click();
+
+                await page.locator('#customerPhone').fill('123'); await page.locator('#sendBtn').click();
+                pass(await page.locator('#customerPhone').getAttribute('aria-invalid')==='true',`${vp.n}: invalid phone receives aria-invalid`);
+                pass(await page.locator('#customerPhone').evaluate(el=>el===document.activeElement),`${vp.n}: validation focuses first invalid field`);
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#sendBtn').click();
+                const url=await page.evaluate(()=>window.__openedUrl);
+                pass(url.startsWith('https://wa.me/639171344775?text='),`${vp.n}: valid order creates WhatsApp request`);
+                const decoded=decodeURIComponent(url);
+                pass(decoded.includes('Mayumu Chunk')&&decoded.includes('QA Tester'),`${vp.n}: WhatsApp payload includes customer and product`);
+
+                await page.locator('[data-payment="Bank transfer"]').click();
+                pass(await page.locator('#gcashCard').evaluate(el=>el.hidden),`${vp.n}: switching payment hides GCash instructions`);
+                pass((await page.locator('#paymentSummary').textContent()).trim()==='Bank transfer',`${vp.n}: payment summary updates`);
+
+                await page.locator('#shareBtn').click();
+                pass(await page.locator('#shareDialog').evaluate(el=>el.open),`${vp.n}: share modal opens`);
+                pass(await page.locator('#shareDialog').evaluate(el=>el.contains(document.activeElement)),`${vp.n}: focus enters modal`);
+                await runAxe(page,`${vp.n}/share-modal`);
+                await page.keyboard.press('Escape');
+                pass(!(await page.locator('#shareDialog').evaluate(el=>el.open)),`${vp.n}: Escape closes share modal`);
+
+                const noClip=await page.evaluate(()=>[...document.querySelectorAll('main a,main button,main input,main select,main textarea,main article,main h1,main h2,main h3')].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').every(el=>{const r=el.getBoundingClientRect();return r.width<=innerWidth+1&&r.right<=innerWidth+1&&r.left>=-1}));
+                pass(noClip,`${vp.n}: primary content does not horizontally clip`);
+                await ctx.close();
+              }
+
+              console.log('\n=== reduced motion ===');
+              const rc=await browser.newContext({viewport:{width:1280,height:800},reducedMotion:'reduce'}); const rp=await rc.newPage();
+              await rp.goto(BASE,{waitUntil:'domcontentloaded'}); await rp.evaluate(()=>localStorage.removeItem('bb_motion')); await rp.reload({waitUntil:'domcontentloaded'});
+              pass(await rp.locator('body').evaluate(el=>el.classList.contains('motion-off')),'prefers-reduced-motion defaults animations off');
+              pass(await rp.locator('#motionBtn').getAttribute('aria-pressed')==='false','motion toggle exposes off state');
+              pass(await rp.evaluate(()=>getComputedStyle(document.documentElement).scrollBehavior)==='auto','reduced motion disables smooth scroll');
+              await rc.close();
+
+              console.log('\n=== no JavaScript ===');
+              const nc=await browser.newContext({viewport:{width:1280,height:800},javaScriptEnabled:false}); const np=await nc.newPage();
+              await np.goto(BASE,{waitUntil:'domcontentloaded'});
+              pass(await np.locator('#story .reveal').first().evaluate(el=>getComputedStyle(el).opacity)==='1','content remains visible without JavaScript');
+              pass((await np.locator('noscript').textContent()).includes('0917 134 4775'),'no-JS fallback provides order contact');
+              await nc.close();
+            } finally {await browser.close()}
+            console.log(`\nFINAL FAILURES: ${failures.length}`); failures.forEach(x=>console.log(`- ${x}`));
+            if(failures.length) process.exit(1);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
