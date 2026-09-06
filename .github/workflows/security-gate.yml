@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   security-gate:
-    name: Security Gate
+    name: Security + SEO Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
 
     steps:
       - name: Checkout source read-only
@@ -27,30 +27,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Reject sensitive file types and names
-        shell: bash
-        run: |
-          set -euo pipefail
-          bad_files="$(find . -path './.git' -prune -o -type f \( \
-            -name '.env' -o -name '.env.*' -o \
-            -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' -o \
-            -name 'id_rsa' -o -name 'id_ed25519' -o \
-            -name 'credentials.json' -o -name 'service-account*.json' \
-          \) -print)"
-          if [ -n "$bad_files" ]; then
-            echo 'Sensitive-looking files must not be committed:'
-            echo "$bad_files"
-            exit 1
-          fi
-          echo 'No forbidden secret/private-key files found.'
-
-      - name: Scan published source for high-confidence secrets
+      - name: Reject sensitive files and scan published source for secrets
         shell: python
         run: |
           from pathlib import Path
           import re, sys
 
-          roots = [Path('index.html'), Path('site.js'), Path('site.css'), Path('robots.txt'), Path('sitemap.xml')]
+          forbidden_names = {'.env','id_rsa','id_ed25519','credentials.json'}
+          forbidden_suffixes = {'.pem','.key','.p12','.pfx'}
+          bad = []
+          for p in Path('.').rglob('*'):
+              if not p.is_file() or '.git' in p.parts:
+                  continue
+              n = p.name.lower()
+              if n in forbidden_names or n.startswith('.env.') or p.suffix.lower() in forbidden_suffixes or n.startswith('service-account') and n.endswith('.json'):
+                  bad.append(str(p))
+          if bad:
+              print('Sensitive-looking files must not be committed:')
+              print('\n'.join(bad)); sys.exit(1)
+
           patterns = {
               'private key': re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
               'AWS access key': re.compile(r'AKIA[0-9A-Z]{16}'),
@@ -59,131 +54,262 @@ jobs:
               'Stripe live secret': re.compile(r'sk_live_[0-9A-Za-z]{20,}'),
               'OpenAI-style secret': re.compile(r'sk-[A-Za-z0-9_-]{24,}'),
           }
-
           findings = []
-          for path in roots:
-              if not path.exists():
+          for p in Path('.').rglob('*'):
+              if not p.is_file() or '.git' in p.parts or p.suffix.lower() not in {'.html','.js','.css','.txt','.xml','.md','.json','.yml','.yaml'}:
                   continue
-              text = path.read_text(encoding='utf-8', errors='ignore')
+              text = p.read_text(encoding='utf-8', errors='ignore')
               for label, rx in patterns.items():
-                  for match in rx.finditer(text):
-                      line = text.count('\n', 0, match.start()) + 1
-                      findings.append(f'{path}:{line}: possible {label}')
-
+                  if rx.search(text): findings.append(f'{p}: possible {label}')
           if findings:
-              print('Potential secrets detected:')
-              print('\n'.join(findings))
-              sys.exit(1)
-          print('No high-confidence secrets detected in published source.')
+              print('Potential secrets detected:'); print('\n'.join(findings)); sys.exit(1)
+          print('Secret and sensitive-file checks passed.')
 
       - name: Validate JavaScript syntax and dangerous constructs
         shell: bash
         run: |
           set -euo pipefail
           node --check site.js
-          if grep -En '\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(|document\.write[[:space:]]*\(' site.js; then
-            echo 'Dangerous JavaScript construct detected.'
-            exit 1
-          fi
-          echo 'JavaScript syntax and dangerous-construct check passed.'
+          node --check content.js
+          for file in site.js content.js; do
+            if grep -En '\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(|document\.write[[:space:]]*\(' "$file"; then
+              echo "Dangerous JavaScript construct detected in $file"
+              exit 1
+            fi
+          done
+          echo 'JavaScript checks passed.'
 
-      - name: Validate browser security contract
+      - name: Validate browser security contract on every HTML page
         shell: python
         run: |
           from html.parser import HTMLParser
           from pathlib import Path
           import re, sys
 
-          html = Path('index.html').read_text(encoding='utf-8')
           errors = []
-
-          class SecurityAudit(HTMLParser):
+          class Audit(HTMLParser):
               def __init__(self):
-                  super().__init__()
-                  self.csp = None
-                  self.in_script = False
-                  self.script_type = ''
-                  self.script_src = None
-                  self.inline_chunks = []
-                  self.executable_inline = []
-                  self.external_scripts = []
-
+                  super().__init__(); self.csp=None; self.in_script=False; self.script_type=''; self.script_src=None; self.buf=[]; self.inline=[]; self.external=[]
               def handle_starttag(self, tag, attrs):
-                  attrs = dict(attrs)
-                  tag = tag.lower()
-
-                  if tag == 'meta' and attrs.get('http-equiv', '').lower() == 'content-security-policy':
-                      self.csp = attrs.get('content', '')
-
-                  if tag == 'script':
-                      self.in_script = True
-                      self.script_type = attrs.get('type', '').lower()
-                      self.script_src = attrs.get('src')
-                      self.inline_chunks = []
-                      if self.script_src:
-                          self.external_scripts.append(self.script_src)
-
-                  for key in attrs:
-                      if key.lower().startswith('on'):
-                          errors.append(f'Inline event handler found: {key}=')
-
+                  attrs=dict(attrs); tag=tag.lower()
+                  if tag=='meta' and attrs.get('http-equiv','').lower()=='content-security-policy': self.csp=attrs.get('content','')
+                  if tag=='script':
+                      self.in_script=True; self.script_type=attrs.get('type','').lower(); self.script_src=attrs.get('src'); self.buf=[]
+                      if self.script_src: self.external.append(self.script_src)
+                  for k in attrs:
+                      if k.lower().startswith('on'): errors.append(f'inline event handler: {k}=')
               def handle_data(self, data):
-                  if self.in_script and not self.script_src:
-                      self.inline_chunks.append(data)
-
+                  if self.in_script and not self.script_src: self.buf.append(data)
               def handle_endtag(self, tag):
-                  if tag.lower() == 'script' and self.in_script:
-                      body = ''.join(self.inline_chunks).strip()
-                      non_executable = self.script_type in {'application/ld+json', 'application/json'}
-                      if body and not non_executable:
-                          self.executable_inline.append(body[:80])
-                      self.in_script = False
-                      self.script_type = ''
-                      self.script_src = None
-                      self.inline_chunks = []
+                  if tag.lower()=='script' and self.in_script:
+                      body=''.join(self.buf).strip()
+                      if body and self.script_type not in {'application/ld+json','application/json'}: self.inline.append(body[:80])
+                      self.in_script=False; self.script_type=''; self.script_src=None; self.buf=[]
 
-          audit = SecurityAudit()
-          audit.feed(html)
-
-          if not audit.csp:
-              errors.append('Missing Content-Security-Policy meta policy')
-          else:
-              csp = audit.csp.lower()
-              required = [
-                  "default-src 'self'",
-                  "script-src 'self'",
-                  "object-src 'none'",
-                  "base-uri 'self'",
-                  "form-action 'self'",
-                  'upgrade-insecure-requests',
-              ]
-              for directive in required:
-                  if directive not in csp:
-                      errors.append(f'CSP missing required directive: {directive}')
-
-          if audit.executable_inline:
-              errors.append('Executable inline JavaScript found; keep executable JS in site.js')
-
-          for src in audit.external_scripts:
-              if src.startswith(('http://', 'https://', '//')):
-                  errors.append(f'External JavaScript source is not allowed: {src}')
-
-          if re.search(r'\bhttp://', html, re.I):
-              errors.append('Insecure http:// URL found in index.html')
-
+          for p in Path('.').rglob('index.html'):
+              if '.git' in p.parts: continue
+              text=p.read_text(encoding='utf-8'); a=Audit(); a.feed(text)
+              if not a.csp: errors.append(f'{p}: missing CSP meta')
+              else:
+                  csp=a.csp.lower()
+                  for d in ["default-src 'self'","script-src 'self'","object-src 'none'","base-uri 'self'","form-action 'self'",'upgrade-insecure-requests']:
+                      if d not in csp: errors.append(f'{p}: CSP missing {d}')
+              if a.inline: errors.append(f'{p}: executable inline JavaScript found')
+              for src in a.external:
+                  if src.startswith(('http://','https://','//')): errors.append(f'{p}: external JavaScript not allowed: {src}')
+              if re.search(r'\bhttp://', text, re.I): errors.append(f'{p}: insecure http:// URL found')
           if errors:
-              print('Security contract failed:')
-              for error in errors:
-                  print(f'- {error}')
-              sys.exit(1)
+              print('Browser security contract failed:'); print('\n'.join('- '+e for e in errors)); sys.exit(1)
+          print('Browser security contract passed across all HTML pages.')
 
-          print('CSP, inline-script, event-handler, and external-script checks passed.')
+      - name: Enforce frozen page set and comprehensive on-page SEO QA
+        shell: python
+        run: |
+          from pathlib import Path, PurePosixPath
+          from html.parser import HTMLParser
+          import json, re, sys, urllib.parse, xml.etree.ElementTree as ET
+
+          BASE='https://balebellabakehouse.com/'
+          EXPECTED={
+            'index.html':BASE,
+            'menu/index.html':BASE+'menu/',
+            'cookies/index.html':BASE+'cookies/',
+            'brownies/index.html':BASE+'brownies/',
+            'basque-cheesecake/index.html':BASE+'basque-cheesecake/',
+            'banana-loaf/index.html':BASE+'banana-loaf/',
+            'gift-boxes/index.html':BASE+'gift-boxes/',
+            'corporate-orders/index.html':BASE+'corporate-orders/',
+            'delivery-san-fernando-pampanga/index.html':BASE+'delivery-san-fernando-pampanga/',
+            'blog/index.html':BASE+'blog/',
+            'blog/how-to-store-fresh-baked-cookies/index.html':BASE+'blog/how-to-store-fresh-baked-cookies/',
+            'blog/basque-cheesecake-vs-regular-cheesecake/index.html':BASE+'blog/basque-cheesecake-vs-regular-cheesecake/',
+            'blog/dessert-gift-ideas-san-fernando-pampanga/index.html':BASE+'blog/dessert-gift-ideas-san-fernando-pampanga/',
+          }
+          CONTENT={k:v for k,v in EXPECTED.items() if k!='index.html'}
+          TYPES={
+            'menu/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','Menu','FAQPage'},
+            'cookies/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','MenuSection','FAQPage'},
+            'brownies/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','MenuSection','FAQPage'},
+            'basque-cheesecake/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Product','FAQPage'},
+            'banana-loaf/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Product','FAQPage'},
+            'gift-boxes/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','ItemList','FAQPage'},
+            'corporate-orders/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'delivery-san-fernando-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'blog/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','Blog','FAQPage'},
+            'blog/how-to-store-fresh-baked-cookies/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
+            'blog/basque-cheesecake-vs-regular-cheesecake/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
+            'blog/dessert-gift-ideas-san-fernando-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
+          }
+          THEMES={
+            'menu/index.html':'theme-menu','cookies/index.html':'theme-cookies','brownies/index.html':'theme-brownies','basque-cheesecake/index.html':'theme-cheesecake','banana-loaf/index.html':'theme-banana','gift-boxes/index.html':'theme-gifts','corporate-orders/index.html':'theme-corporate','delivery-san-fernando-pampanga/index.html':'theme-delivery','blog/index.html':'theme-journal','blog/how-to-store-fresh-baked-cookies/index.html':'theme-cookies','blog/basque-cheesecake-vs-regular-cheesecake/index.html':'theme-cheesecake','blog/dessert-gift-ideas-san-fernando-pampanga/index.html':'theme-gifts'
+          }
+          errors=[]
+
+          class A(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.title=''; self.it=False; self.h1=0; self.meta=[]; self.links=[]; self.scripts=[]; self.ins=False; self.st=''; self.ss=None; self.sb=[]; self.nd=0; self.nt=[]; self.cn=[]; self.details=[]; self.idet=False; self.isum=False; self.ip=False; self.dq=[]; self.da=[]
+              def handle_starttag(self, tag, attrs):
+                  attrs=dict(attrs); tag=tag.lower()
+                  if tag=='title': self.it=True
+                  if tag=='h1': self.h1+=1
+                  if tag=='meta': self.meta.append(attrs)
+                  if tag=='a' and attrs.get('href'): self.links.append((attrs.get('href'),attrs.get('target'),attrs.get('rel','')))
+                  if tag=='nav' and attrs.get('aria-label')=='Main navigation': self.nd=1; self.cn=[]
+                  elif self.nd: self.nd+=1
+                  if tag=='script': self.ins=True; self.st=attrs.get('type','').lower(); self.ss=attrs.get('src'); self.sb=[]
+                  if tag=='details': self.idet=True; self.dq=[]; self.da=[]
+                  elif self.idet and tag=='summary': self.isum=True
+                  elif self.idet and tag=='p': self.ip=True
+              def handle_data(self,data):
+                  if self.it:self.title+=data
+                  if self.ins and not self.ss:self.sb.append(data)
+                  if self.nd:self.cn.append(data)
+                  if self.idet and self.isum:self.dq.append(data)
+                  if self.idet and self.ip:self.da.append(data)
+              def handle_endtag(self,tag):
+                  tag=tag.lower()
+                  if tag=='title':self.it=False
+                  if self.nd:
+                      self.nd-=1
+                      if tag=='nav' and self.nd==0:self.nt=self.cn[:]
+                  if tag=='script' and self.ins:
+                      self.scripts.append((self.st,self.ss,''.join(self.sb).strip())); self.ins=False; self.st=''; self.ss=None; self.sb=[]
+                  if tag=='summary':self.isum=False
+                  if tag=='p' and self.idet:self.ip=False
+                  if tag=='details' and self.idet:
+                      q=' '.join(''.join(self.dq).split()); a=' '.join(''.join(self.da).split())
+                      if q and a:self.details.append((q,a))
+                      self.idet=False; self.isum=False; self.ip=False
+
+          def meta(a,name=None,prop=None):
+              for x in a.meta:
+                  if name and x.get('name','').lower()==name.lower():return x.get('content','')
+                  if prop and x.get('property','').lower()==prop.lower():return x.get('content','')
+              return ''
+          def canon(text):
+              m=re.search(r'<link\s+[^>]*rel=["\']canonical["\'][^>]*href=["\']([^"\']+)',text,re.I) or re.search(r'<link\s+[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\']canonical["\']',text,re.I)
+              return m.group(1) if m else ''
+          def hreflang(text,lang):
+              for tag in re.findall(r'<link\b[^>]+>',text,re.I):
+                  if re.search(r'rel=["\']alternate["\']',tag,re.I) and re.search(rf'hreflang=["\']{re.escape(lang)}["\']',tag,re.I):
+                      m=re.search(r'href=["\']([^"\']+)',tag,re.I); return m.group(1) if m else ''
+              return ''
+          def types(schema):
+              out=set()
+              def walk(x):
+                  if isinstance(x,dict):
+                      t=x.get('@type')
+                      if isinstance(t,str):out.add(t)
+                      elif isinstance(t,list):out.update(v for v in t if isinstance(v,str))
+                      for v in x.values():walk(v)
+                  elif isinstance(x,list):
+                      for v in x:walk(v)
+              walk(schema); return out
+          def local_exists(href):
+              if href.startswith(('#','mailto:','tel:','javascript:','https://','http://','//')):return True
+              path=urllib.parse.urlsplit(href).path
+              if not path or path=='/':return Path('index.html').exists()
+              p=PurePosixPath(path.lstrip('/'))
+              return Path(p/'index.html').exists() if path.endswith('/') else Path(p).exists() or Path(str(p)+'/index.html').exists()
+
+          actual={p.as_posix() for p in Path('.').rglob('index.html') if '.git' not in p.parts}
+          if actual!=set(EXPECTED):errors.append(f'PAGE FREEZE VIOLATION added={sorted(actual-set(EXPECTED))} removed={sorted(set(EXPECTED)-actual)}')
+
+          seen_t={};seen_d={};seen_c={};incoming={u:0 for u in EXPECTED.values()}
+          for file,wanted in CONTENT.items():
+              p=Path(file)
+              if not p.exists():errors.append(f'{file}: missing');continue
+              text=p.read_text(encoding='utf-8'); a=A(); a.feed(text)
+              title=' '.join(a.title.split()); desc=meta(a,name='description').strip(); keys=meta(a,name='keywords').strip(); c=canon(text)
+              if a.h1!=1:errors.append(f'{file}: H1 count {a.h1}')
+              if not 25<=len(title)<=75:errors.append(f'{file}: title length {len(title)}')
+              if not 120<=len(desc)<=190:errors.append(f'{file}: description length {len(desc)}')
+              if len([x for x in keys.split(',') if x.strip()])<4:errors.append(f'{file}: missing focused keyword set')
+              if c!=wanted:errors.append(f'{file}: canonical mismatch')
+              if hreflang(text,'en-PH')!=wanted or hreflang(text,'x-default')!=wanted:errors.append(f'{file}: hreflang mismatch')
+              if meta(a,prop='og:url')!=wanted:errors.append(f'{file}: og:url mismatch')
+              for x,k in [('description','name'),('robots','name'),('googlebot','name'),('bingbot','name'),('og:title','prop'),('og:description','prop'),('og:image','prop'),('twitter:card','name'),('twitter:title','name'),('twitter:description','name'),('twitter:image','name')]:
+                  if not meta(a,name=x) if k=='name' else not meta(a,prop=x):errors.append(f'{file}: missing {x}')
+              nav=' '.join(' '.join(a.nt).split())
+              for label in ['Menu','Our Story','Location','Blog','Order']:
+                  if label not in nav:errors.append(f'{file}: nav missing {label}')
+              if THEMES[file] not in text:errors.append(f'{file}: missing expected visual theme {THEMES[file]}')
+              for required in ['href="/menu/"','href="/blog/"','href="/#order"']:
+                  if required not in text:errors.append(f'{file}: missing key internal route {required}')
+              for href,target,rel in a.links:
+                  if not local_exists(href):errors.append(f'{file}: broken local link {href}')
+                  if target=='_blank' and ('noopener' not in rel or 'noreferrer' not in rel):errors.append(f'{file}: unsafe target blank {href}')
+                  normalized=urllib.parse.urljoin(BASE,href).split('#',1)[0]
+                  if normalized in incoming and normalized!=wanted:incoming[normalized]+=1
+              schemas=[]
+              for st,src,body in a.scripts:
+                  if body and st=='application/ld+json':
+                      try:schemas.append(json.loads(body))
+                      except Exception as e:errors.append(f'{file}: invalid JSON-LD {e}')
+              if not schemas:errors.append(f'{file}: no JSON-LD')
+              else:
+                  s=schemas[0]
+                  if isinstance(s,dict) and isinstance(s.get('@graph'),list) and any(isinstance(x,list) for x in s['@graph']):errors.append(f'{file}: nested array in @graph')
+                  missing=TYPES[file]-types(s)
+                  if missing:errors.append(f'{file}: missing schema types {sorted(missing)}')
+                  faqs=[]
+                  def walk(x):
+                      if isinstance(x,dict):
+                          if x.get('@type')=='FAQPage':faqs.append(x)
+                          for v in x.values():walk(v)
+                      elif isinstance(x,list):
+                          for v in x:walk(v)
+                  walk(s)
+                  if not a.details:errors.append(f'{file}: no visible FAQs')
+                  if not faqs:errors.append(f'{file}: no FAQ schema')
+                  elif len(faqs[0].get('mainEntity',[]))!=len(a.details):errors.append(f'{file}: FAQ visible/schema mismatch')
+              for value,seen,label in [(title,seen_t,'title'),(desc,seen_d,'description'),(c,seen_c,'canonical')]:
+                  if value in seen:errors.append(f'{file}: duplicate {label} with {seen[value]}')
+                  else:seen[value]=file
+
+          for u,n in incoming.items():
+              if u!=BASE and n==0:errors.append(f'orphan page: {u}')
+          try:
+              root=ET.parse('sitemap.xml').getroot();ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9'};locs={x.text.strip() for x in root.findall('s:url/s:loc',ns) if x.text}
+              if locs!=set(EXPECTED.values()):errors.append('sitemap URL set does not match frozen page set')
+          except Exception as e:errors.append(f'sitemap invalid: {e}')
+          robots=Path('robots.txt').read_text(encoding='utf-8')
+          if BASE+'sitemap.xml' not in robots:errors.append('robots.txt missing production sitemap')
+          llms=Path('llms.txt').read_text(encoding='utf-8')
+          for u in CONTENT.values():
+              if u not in llms:errors.append(f'llms.txt missing {u}')
+          for p in [Path('index.html'),Path('robots.txt'),Path('sitemap.xml'),Path('llms.txt')]+[Path(x) for x in CONTENT]:
+              t=p.read_text(encoding='utf-8',errors='ignore')
+              if 'johnpelquingua.github.io/bale-bella-bakehouse' in t or 'bale-bella-bakehouse.pages.dev' in t:errors.append(f'{p}: legacy production URL found')
+          if errors:
+              print('SEO/PAGE-FREEZE QA FAILED');print('\n'.join('- '+e for e in errors));sys.exit(1)
+          print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages. No new pages permitted without deliberate gate change.')
 
       - name: Verify required production files
         shell: bash
         run: |
           set -euo pipefail
-          for file in index.html site.css site.js logo.svg robots.txt sitemap.xml SECURITY.md .well-known/security.txt; do
+          for file in index.html site.css site.js content.css content.js logo.svg robots.txt sitemap.xml llms.txt _headers SECURITY.md .well-known/security.txt; do
             test -f "$file" || { echo "Missing required production/security file: $file"; exit 1; }
           done
-          echo 'Required production and security files are present.'
+          echo 'Required production, content and security files are present.'
