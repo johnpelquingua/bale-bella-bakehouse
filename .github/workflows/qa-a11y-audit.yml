@@ -4,10 +4,17 @@ on:
   push:
     branches: [main]
     paths:
+      - 'index.html'
+      - 'site.js'
+      - 'site.css'
       - '.github/workflows/qa-a11y-audit.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: bb-qa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   qa:
@@ -15,21 +22,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
-
       - name: Install isolated QA tooling
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/bb-qa
-          cd /tmp/bb-qa
+          mkdir -p /tmp/bb-qa && cd /tmp/bb-qa
           npm init -y >/dev/null 2>&1
           npm install --no-save playwright @axe-core/playwright
           npx playwright install --with-deps chromium
-
       - name: Run functional and WCAG 2.2 AA browser QA
         shell: bash
         env:
@@ -40,145 +43,185 @@ jobs:
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           sleep 1
-
           node <<'NODE'
           const { chromium } = require('playwright');
           const AxeBuilder = require('@axe-core/playwright').default;
-
           const BASE = 'http://127.0.0.1:4173/';
           const failures = [];
-          const a11yViolations = [];
-          const check = (condition, message) => {
-            if (!condition) failures.push(message);
-            console.log(`${condition ? 'PASS' : 'FAIL'}: ${message}`);
+          const axeFindings = [];
+          const check = (ok, msg) => {
+            console.log(`${ok ? 'PASS' : 'FAIL'}: ${msg}`);
+            if (!ok) failures.push(msg);
           };
-
+          async function axe(page, viewport, state) {
+            const r = await new AxeBuilder({ page })
+              .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice'])
+              .analyze();
+            if (!r.violations.length) console.log(`PASS: ${viewport}: axe ${state} — no violations`);
+            for (const v of r.violations) {
+              axeFindings.push({viewport,state,id:v.id,impact:v.impact});
+              console.log(`A11Y [${v.impact}] ${viewport}/${state}: ${v.id} — ${v.help}`);
+              for (const n of v.nodes) {
+                console.log(`  target: ${n.target.join(' ')}`);
+                console.log(`  html: ${String(n.html||'').replace(/\n/g,' ')}`);
+                console.log(`  ${String(n.failureSummary||'').replace(/\n/g,' ')}`);
+              }
+            }
+          }
           (async () => {
-            const browser = await chromium.launch({ headless: true });
+            const browser = await chromium.launch({headless:true});
             try {
-              for (const viewport of [
-                { name: 'desktop', width: 1440, height: 1000 },
-                { name: 'mobile', width: 390, height: 844 }
+              for (const vp of [
+                {name:'desktop',width:1440,height:1000},
+                {name:'mobile',width:390,height:844},
+                {name:'narrow-320',width:320,height:900}
               ]) {
-                console.log(`\n=== ${viewport.name.toUpperCase()} ${viewport.width}x${viewport.height} ===`);
-                const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+                console.log(`\n=== ${vp.name.toUpperCase()} ===`);
+                const context = await browser.newContext({viewport:{width:vp.width,height:vp.height}});
                 const page = await context.newPage();
                 const pageErrors = [];
                 page.on('pageerror', e => pageErrors.push(e.message));
                 await page.addInitScript(() => {
                   window.__openedUrl = '';
-                  window.open = (url) => {
-                    window.__openedUrl = String(url || '');
-                    return { opener: null };
-                  };
-                  if (!sessionStorage.getItem('__bbQaInitialized')) {
-                    localStorage.removeItem('bb_cart');
-                    sessionStorage.removeItem('bb_order_ref');
-                    sessionStorage.setItem('__bbQaInitialized', '1');
-                  }
+                  window.open = (url) => { window.__openedUrl=String(url||''); return {opener:null}; };
+                  window.confirm = () => true;
                 });
-                await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+                await page.goto(BASE,{waitUntil:'domcontentloaded'});
+                await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+                await page.reload({waitUntil:'domcontentloaded'});
                 await page.waitForSelector('#menuGrid .card');
 
-                check(pageErrors.length === 0, `${viewport.name}: no uncaught JavaScript errors${pageErrors.length ? ' — ' + pageErrors.join(' | ') : ''}`);
-                check(await page.locator('h1').count() === 1, `${viewport.name}: exactly one H1`);
-                check(await page.locator('main').count() === 1, `${viewport.name}: main landmark present`);
-                check(await page.locator('nav[aria-label="Main navigation"]').count() === 1, `${viewport.name}: labelled main navigation present`);
-                check(await page.locator('img:not([alt])').count() === 0, `${viewport.name}: all img elements have alt attributes`);
-                check(await page.locator('iframe:not([title])').count() === 0, `${viewport.name}: all iframes have titles`);
+                check(pageErrors.length===0, `${vp.name}: no uncaught JavaScript errors`);
+                check(await page.locator('h1').count()===1, `${vp.name}: exactly one H1`);
+                check(await page.locator('main').count()===1, `${vp.name}: main landmark present`);
+                check(await page.locator('nav[aria-label="Main navigation"]').count()===1, `${vp.name}: labelled main navigation present`);
+                check(await page.locator('img:not([alt])').count()===0, `${vp.name}: every image has alt`);
+                check(await page.locator('iframe:not([title])').count()===0, `${vp.name}: every iframe has a title`);
+                check(await page.locator('#orderForm').count()===1, `${vp.name}: semantic order form present`);
+                check(await page.locator('[role="group"][aria-labelledby="orderTypeLabel"]').count()===1, `${vp.name}: order type control group labelled`);
+                check(await page.locator('[role="group"][aria-labelledby="fulfillmentLabel"]').count()===1, `${vp.name}: fulfillment control group labelled`);
+                check(await page.locator('[role="group"][aria-labelledby="paymentLabel"]').count()===1, `${vp.name}: payment control group labelled`);
+                check(await page.locator('#customerName').getAttribute('required')!==null, `${vp.name}: name marked required`);
+                check(await page.locator('#customerPhone').getAttribute('required')!==null, `${vp.name}: phone marked required`);
+                check(await page.locator('#orderDate').getAttribute('required')!==null, `${vp.name}: preferred date marked required`);
+                check(await page.locator('#customerPhone').getAttribute('aria-describedby')==='customerPhoneError', `${vp.name}: phone error associated with field`);
 
                 await page.locator('body').focus();
                 await page.keyboard.press('Tab');
-                const firstFocusClass = await page.evaluate(() => document.activeElement?.className || '');
-                check(String(firstFocusClass).includes('skip-link'), `${viewport.name}: first keyboard focus reaches skip link`);
+                check(String(await page.evaluate(()=>document.activeElement?.className||'')).includes('skip-link'), `${vp.name}: first Tab reaches skip-to-main link`);
+                check(await page.locator('.skip-link').getAttribute('href')==='#top', `${vp.name}: skip link targets main content`);
+                await page.locator('.skip-link').press('Enter');
+                check(await page.evaluate(()=>location.hash)==='#top', `${vp.name}: skip link activates main target`);
 
-                const allCards = await page.locator('#menuGrid .card').count();
-                check(allCards === 9, `${viewport.name}: all 9 menu products render`);
-                await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-                const cookieCards = await page.locator('#menuGrid .card').count();
-                check(cookieCards === 4, `${viewport.name}: Cookies filter renders 4 products`);
-                await page.getByRole('button', { name: 'All', exact: true }).click();
+                check(await page.locator('#menuGrid .card').count()===9, `${vp.name}: all 9 products render`);
+                await page.getByRole('button',{name:'Cookies',exact:true}).click();
+                check(await page.locator('#menuGrid .card').count()===4, `${vp.name}: Cookies filter renders 4 products`);
+                check((await page.locator('#menuStatus').textContent()).includes('4'), `${vp.name}: menu filter change announced concisely`);
+                await page.getByRole('button',{name:'All',exact:true}).click();
+                check((await page.locator('[data-add="mayumu"]').getAttribute('aria-label')||'').toLowerCase().includes('mayumu'), `${vp.name}: add button has product-specific accessible name`);
 
+                const mayumuSelect = page.locator('[data-variant-select="mayumu"]');
+                await mayumuSelect.selectOption('1');
+                check((await page.locator('#price-mayumu').textContent()).trim()==='₱360', `${vp.name}: variant selection updates product price`);
+                await mayumuSelect.selectOption('0');
                 await page.locator('[data-add="mayumu"]').click();
-                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: adding a product increments cart count`);
-                const storedCart = await page.evaluate(() => localStorage.getItem('bb_cart'));
-                check(Boolean(storedCart && storedCart.includes('mayumu')), `${viewport.name}: cart persists to localStorage`);
-                await page.reload({ waitUntil: 'domcontentloaded' });
+                check((await page.locator('#cartCount').textContent()).trim()==='1', `${vp.name}: add-to-cart works`);
+                check((await page.locator('#subtotal').textContent()).trim()==='₱95', `${vp.name}: subtotal is correct`);
+                check(Boolean((await page.evaluate(()=>localStorage.getItem('bb_cart')))||''), `${vp.name}: cart saved to localStorage`);
+                await page.reload({waitUntil:'domcontentloaded'});
                 await page.waitForSelector('#menuGrid .card');
-                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: cart restores after reload`);
+                check((await page.locator('#cartCount').textContent()).trim()==='1', `${vp.name}: cart restores after reload`);
+                check((await page.locator('#cartList [data-delta="1"]').first().getAttribute('aria-label')||'').toLowerCase().includes('increase'), `${vp.name}: cart increment has accessible name`);
                 await page.locator('#cartList [data-delta="1"]').first().click();
-                check((await page.locator('#cartCount').textContent()).trim() === '2', `${viewport.name}: quantity increment works`);
+                check((await page.locator('#subtotal').textContent()).trim()==='₱190', `${vp.name}: quantity increment recalculates total`);
                 await page.locator('#cartList [data-delta="-1"]').first().click();
-                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: quantity decrement works`);
+                check((await page.locator('#subtotal').textContent()).trim()==='₱95', `${vp.name}: quantity decrement recalculates total`);
+
+                await page.locator('[data-add="banana"]').click();
+                check((await page.locator('#leadHint').textContent()).includes('2 days'), `${vp.name}: cart lead time adjusts to longest-lead product`);
+                await page.locator('#cartList [data-cart-key^="banana::"][data-delta="-1"]').first().click();
+
+                await axe(page,vp.name,'initial/order');
 
                 await page.locator('[data-mode="delivery"]').click();
-                check(!(await page.locator('#addressField').evaluate(el => el.hidden)), `${viewport.name}: Delivery reveals address field`);
-                check(await page.locator('[data-mode="delivery"]').getAttribute('aria-pressed') === 'true', `${viewport.name}: Delivery toggle exposes selected state`);
+                check(!(await page.locator('#addressField').evaluate(el=>el.hidden)), `${vp.name}: Delivery reveals address field`);
+                check(await page.locator('#address').evaluate(el=>el.required), `${vp.name}: delivery address becomes required`);
+                check(await page.locator('#address').getAttribute('aria-required')==='true', `${vp.name}: delivery address required state exposed`);
                 await page.locator('[data-order-type="gift"]').click();
-                check(!(await page.locator('#giftFields').evaluate(el => el.hidden)), `${viewport.name}: Gift reveals recipient fields`);
-                check(await page.locator('#recipientName').evaluate(el => el.required), `${viewport.name}: Gift recipient becomes required`);
-                await page.locator('[data-order-type="personal"]').click();
-                await page.locator('[data-payment="Bank transfer"]').click();
-                check(await page.locator('#gcashCard').evaluate(el => el.hidden), `${viewport.name}: non-GCash payment hides GCash instructions`);
-                check((await page.locator('#paymentSummary').textContent()).trim() === 'Bank transfer', `${viewport.name}: payment summary updates`);
-                await page.locator('[data-payment="GCash"]').click();
+                check(!(await page.locator('#giftFields').evaluate(el=>el.hidden)), `${vp.name}: Gift reveals recipient fields`);
+                check(await page.locator('#recipientName').evaluate(el=>el.required), `${vp.name}: gift recipient becomes required`);
+                await axe(page,vp.name,'delivery-gift');
 
+                await page.locator('[data-order-type="corporate"]').click();
+                check(!(await page.locator('#corporateFields').evaluate(el=>el.hidden)), `${vp.name}: Corporate reveals company fields`);
+                check(await page.locator('#companyName').evaluate(el=>el.required), `${vp.name}: company becomes required`);
+                check(await page.locator('#guestCount').evaluate(el=>el.required), `${vp.name}: corporate quantity becomes required`);
+                await page.locator('#companyName').fill('QA Company');
+                await page.locator('#guestCount').fill('9');
                 await page.locator('#customerName').fill('QA Tester');
-                await page.locator('#customerPhone').fill('123');
-                await page.locator('[data-mode="pickup"]').click();
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#address').fill('QA Address, San Fernando');
                 await page.locator('#sendBtn').click();
-                check(await page.locator('#customerPhone').getAttribute('aria-invalid') === 'true', `${viewport.name}: invalid phone is identified accessibly`);
-                check(await page.locator('#customerPhone').evaluate(el => el === document.activeElement), `${viewport.name}: validation focuses first invalid field`);
+                check(await page.locator('#guestCount').getAttribute('aria-invalid')==='true', `${vp.name}: corporate minimum quantity validation works`);
+                await page.locator('#guestCount').fill('10');
+                await page.locator('[data-order-type="personal"]').click();
+                await page.locator('[data-mode="pickup"]').click();
+
+                await page.locator('#customerPhone').fill('123');
+                await page.locator('#sendBtn').click();
+                check(await page.locator('#customerPhone').getAttribute('aria-invalid')==='true', `${vp.name}: invalid PH phone identified accessibly`);
+                check(await page.locator('#customerPhone').evaluate(el=>el===document.activeElement), `${vp.name}: validation focuses first invalid field`);
                 await page.locator('#customerPhone').fill('09171344775');
                 await page.locator('#sendBtn').click();
-                const openedUrl = await page.evaluate(() => window.__openedUrl);
-                check(openedUrl.startsWith('https://wa.me/639171344775?text='), `${viewport.name}: valid order builds WhatsApp URL`);
-                check(decodeURIComponent(openedUrl).includes('Mayumu Chunk'), `${viewport.name}: WhatsApp payload includes cart item`);
-                check(decodeURIComponent(openedUrl).includes('QA Tester'), `${viewport.name}: WhatsApp payload includes customer name`);
+                const orderUrl = await page.evaluate(()=>window.__openedUrl);
+                check(orderUrl.startsWith('https://wa.me/639171344775?text='), `${vp.name}: valid order builds WhatsApp URL`);
+                const decoded = decodeURIComponent(orderUrl);
+                check(decoded.includes('Mayumu Chunk')&&decoded.includes('QA Tester'), `${vp.name}: WhatsApp payload contains order and customer`);
+
+                await page.locator('[data-payment="Bank transfer"]').click();
+                check(await page.locator('#gcashCard').evaluate(el=>el.hidden), `${vp.name}: non-GCash payment hides GCash instructions`);
+                check((await page.locator('#paymentSummary').textContent()).trim()==='Bank transfer', `${vp.name}: payment summary updates`);
+                await page.locator('[data-payment="GCash"]').click();
 
                 await page.locator('#shareBtn').click();
-                check(await page.locator('#shareDialog').evaluate(el => el.open), `${viewport.name}: share dialog opens`);
-                check(await page.locator('#shareDialog').evaluate(el => el.contains(document.activeElement)), `${viewport.name}: focus enters modal dialog`);
+                check(await page.locator('#shareDialog').evaluate(el=>el.open), `${vp.name}: share dialog opens`);
+                check(await page.locator('#shareDialog').evaluate(el=>el.contains(document.activeElement)), `${vp.name}: focus moves inside share modal`);
+                await axe(page,vp.name,'share-dialog');
                 await page.keyboard.press('Escape');
-                check(!(await page.locator('#shareDialog').evaluate(el => el.open)), `${viewport.name}: Escape closes share dialog`);
+                check(!(await page.locator('#shareDialog').evaluate(el=>el.open)), `${vp.name}: Escape closes share dialog`);
 
-                const results = await new AxeBuilder({ page })
-                  .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice'])
-                  .analyze();
-                if (results.violations.length) {
-                  console.log(`\nA11Y VIOLATIONS (${viewport.name}): ${results.violations.length}`);
-                  for (const v of results.violations) {
-                    a11yViolations.push({ viewport: viewport.name, id: v.id, impact: v.impact });
-                    console.log(`- [${v.impact}] ${v.id}: ${v.help}`);
-                    for (const n of v.nodes) {
-                      console.log(`    target: ${n.target.join(' ')}`);
-                      console.log(`    html: ${String(n.html || '').replace(/\n/g, ' ')}`);
-                      console.log(`    ${String(n.failureSummary || '').replace(/\n/g, ' ')}`);
-                    }
-                  }
-                } else {
-                  console.log(`PASS: ${viewport.name}: axe WCAG 2.2 AA/best-practice scan found no violations`);
-                }
+                const contentFits = await page.evaluate(() => [...document.querySelectorAll('main a,main button,main input,main select,main textarea,main article,main h1,main h2,main h3')]
+                  .filter(el => el.getClientRects().length && getComputedStyle(el).visibility!=='hidden')
+                  .every(el => { const r=el.getBoundingClientRect(); return r.width<=innerWidth+1 && r.right<=innerWidth+1 && r.left>=-1; }));
+                check(contentFits, `${vp.name}: primary content and controls do not clip horizontally`);
                 await context.close();
               }
-            } finally {
-              await browser.close();
-            }
 
-            console.log('\n=== QA SUMMARY ===');
-            console.log(`Functional failures: ${failures.length}`);
-            console.log(`Axe violations: ${a11yViolations.length}`);
-            if (failures.length) {
-              console.log('\nFUNCTIONAL FAILURES');
-              failures.forEach(f => console.log(`- ${f}`));
-            }
-            if (a11yViolations.length) {
-              console.log('\nAXE IDS');
-              [...new Set(a11yViolations.map(v => v.id))].forEach(id => console.log(`- ${id}`));
-            }
-            if (failures.length || a11yViolations.length) process.exit(1);
-          })().catch(err => {
-            console.error(err);
-            process.exit(1);
-          });
+              console.log('\n=== REDUCED MOTION ===');
+              const reduced = await browser.newContext({viewport:{width:1280,height:800},reducedMotion:'reduce'});
+              const rp = await reduced.newPage();
+              await rp.goto(BASE,{waitUntil:'domcontentloaded'});
+              await rp.evaluate(()=>localStorage.removeItem('bb_motion'));
+              await rp.reload({waitUntil:'domcontentloaded'});
+              check(await rp.locator('body').evaluate(el=>el.classList.contains('motion-off')), 'prefers-reduced-motion defaults site motion off');
+              check(await rp.locator('#motionBtn').getAttribute('aria-pressed')==='false', 'motion control exposes reduced state');
+              check(await rp.evaluate(()=>getComputedStyle(document.documentElement).scrollBehavior)==='auto', 'reduced motion disables smooth scrolling');
+              await reduced.close();
+
+              console.log('\n=== NO JAVASCRIPT PROGRESSIVE ENHANCEMENT ===');
+              const nojs = await browser.newContext({viewport:{width:1280,height:800},javaScriptEnabled:false});
+              const np = await nojs.newPage();
+              await np.goto(BASE,{waitUntil:'domcontentloaded'});
+              check(await np.locator('#story').evaluate(el=>getComputedStyle(el.querySelector('.reveal')).opacity)==='1', 'meaningful content remains visible when JavaScript is unavailable');
+              check(await np.locator('noscript').textContent().then(t=>t.includes('0917 134 4775')), 'no-JS fallback provides an order contact method');
+              await nojs.close();
+            } finally { await browser.close(); }
+
+            console.log('\n=== FINAL QA SUMMARY ===');
+            console.log(`Functional/semantic failures: ${failures.length}`);
+            console.log(`Axe findings: ${axeFindings.length}`);
+            if (failures.length) failures.forEach(f=>console.log(`- ${f}`));
+            if (axeFindings.length) [...new Set(axeFindings.map(v=>v.id))].forEach(id=>console.log(`- axe: ${id}`));
+            if (failures.length || axeFindings.length) process.exit(1);
+          })().catch(e=>{console.error(e);process.exit(1)});
           NODE
