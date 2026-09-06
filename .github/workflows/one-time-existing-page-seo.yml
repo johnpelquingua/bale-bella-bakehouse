@@ -21,6 +21,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sed -i 's/Corporate Dessert Orders in San Fernando, Pampanga | Bale Bella Bakehouse/Corporate Dessert Orders San Fernando | Bale Bella Bakehouse/' tools/optimize-existing-pages.py
+          sed -i 's/Bakery Pickup \& Delivery in San Fernando, Pampanga | Bale Bella Bakehouse/Bakery Pickup \& Delivery San Fernando | Bale Bella Bakehouse/' tools/optimize-existing-pages.py
           python tools/optimize-existing-pages.py
           node --check site.js
           node --check content.js
