@@ -1,0 +1,246 @@
+name: Social Preview and Share Menu
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/social-share-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+
+      - name: Build optimized social preview images
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet cairosvg pillow
+          python - <<'PY'
+          from pathlib import Path
+          from io import BytesIO
+          from PIL import Image, ImageDraw, ImageFont
+          import cairosvg
+
+          BG = '#fbf6ed'
+          BROWN = '#6f4027'
+          MUTED = '#936243'
+          GOLD = '#f1bd5b'
+          svg = Path('logo.svg').read_bytes()
+
+          def font(size, bold=False):
+              options = [
+                  '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                  '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+              ]
+              for p in options:
+                  if Path(p).exists():
+                      return ImageFont.truetype(p, size)
+              return ImageFont.load_default()
+
+          def rendered_logo(max_w, max_h):
+              data = cairosvg.svg2png(bytestring=svg, output_width=max_w)
+              im = Image.open(BytesIO(data)).convert('RGBA')
+              scale = min(max_w / im.width, max_h / im.height, 1)
+              if scale < 1:
+                  im = im.resize((round(im.width*scale), round(im.height*scale)), Image.Resampling.LANCZOS)
+              return im
+
+          def fit_text(draw, text, max_width, start_size, bold=False):
+              size = start_size
+              while size > 20:
+                  f = font(size, bold)
+                  box = draw.textbbox((0,0), text, font=f)
+                  if box[2]-box[0] <= max_width:
+                      return f
+                  size -= 2
+              return font(size, bold)
+
+          def center_text(draw, y, text, f, fill):
+              box = draw.textbbox((0,0), text, font=f)
+              x = (draw._image.size[0] - (box[2]-box[0])) / 2
+              draw.text((x,y), text, font=f, fill=fill)
+
+          # 1200x630: Open Graph / Facebook / X / generic social preview.
+          canvas = Image.new('RGB', (1200,630), BG)
+          d = ImageDraw.Draw(canvas)
+          d.rounded_rectangle((32,32,1168,598), radius=36, outline='#eadfce', width=3)
+          d.ellipse((72,65,245,238), fill='#fff1ca')
+          d.ellipse((995,385,1165,555), fill='#f5e6d2')
+          logo = rendered_logo(760, 350)
+          canvas.paste(logo, ((1200-logo.width)//2, 78), logo)
+          tagline = 'From our bale to yours.'
+          location = 'San Fernando, Pampanga  •  EST 2026'
+          center_text(d, 450, tagline, fit_text(d, tagline, 980, 42, True), BROWN)
+          center_text(d, 510, location, fit_text(d, location, 980, 25, False), MUTED)
+          d.rounded_rectangle((484,560,716,570), radius=5, fill=GOLD)
+          canvas.save('bale-bella-social-share.png', 'PNG', optimize=True)
+
+          # 1000x1500: Pinterest-friendly branded vertical image.
+          pin = Image.new('RGB', (1000,1500), BG)
+          pd = ImageDraw.Draw(pin)
+          pd.rounded_rectangle((42,42,958,1458), radius=46, outline='#eadfce', width=4)
+          pd.ellipse((70,80,300,310), fill='#fff1ca')
+          pd.ellipse((720,1160,960,1400), fill='#f5e6d2')
+          plogo = rendered_logo(760, 640)
+          pin.paste(plogo, ((1000-plogo.width)//2, 310), plogo)
+          center_text(pd, 1015, tagline, fit_text(pd, tagline, 860, 52, True), BROWN)
+          center_text(pd, 1090, 'Mayumu. Manyaman. Made with Lugud.', fit_text(pd, 'Mayumu. Manyaman. Made with Lugud.', 850, 30), MUTED)
+          center_text(pd, 1160, 'San Fernando, Pampanga  •  EST 2026', fit_text(pd, 'San Fernando, Pampanga  •  EST 2026', 850, 27), MUTED)
+          pd.rounded_rectangle((350,1250,650,1262), radius=6, fill=GOLD)
+          pin.save('bale-bella-pinterest-share.png', 'PNG', optimize=True)
+          PY
+
+      - name: Patch social metadata and share dialog
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          base = 'https://johnpelquingua.github.io/bale-bella-bakehouse/'
+          social = base + 'bale-bella-social-share.png?v=1'
+          pin = base + 'bale-bella-pinterest-share.png?v=1'
+          alt = 'Bale Bella Bakehouse logo on a warm cream background with the tagline From our bale to yours.'
+
+          html_path = Path('index.html')
+          html = html_path.read_text(encoding='utf-8')
+
+          # Remove prior social image tags so the new image is unambiguous for crawlers.
+          patterns = [
+              r'<meta property="og:image" content="[^"]*">',
+              r'<meta property="og:image:url" content="[^"]*">',
+              r'<meta property="og:image:secure_url" content="[^"]*">',
+              r'<meta property="og:image:type" content="[^"]*">',
+              r'<meta property="og:image:width" content="[^"]*">',
+              r'<meta property="og:image:height" content="[^"]*">',
+              r'<meta property="og:image:alt" content="[^"]*">',
+              r'<meta name="twitter:image" content="[^"]*">',
+              r'<meta name="twitter:image:alt" content="[^"]*">',
+              r'<link rel="image_src" href="[^"]*">',
+              r'<meta itemprop="image" content="[^"]*">',
+          ]
+          for p in patterns:
+              html = re.sub(p, '', html, flags=re.I)
+
+          html = re.sub(
+              r'<meta name="twitter:card" content="[^"]*">',
+              '<meta name="twitter:card" content="summary_large_image">',
+              html,
+              count=1,
+              flags=re.I,
+          )
+
+          social_meta = (
+              f'<link rel="image_src" href="{social}">'
+              f'<meta itemprop="image" content="{social}">'
+              f'<meta property="og:image" content="{social}">'
+              f'<meta property="og:image:url" content="{social}">'
+              f'<meta property="og:image:secure_url" content="{social}">'
+              '<meta property="og:image:type" content="image/png">'
+              '<meta property="og:image:width" content="1200">'
+              '<meta property="og:image:height" content="630">'
+              f'<meta property="og:image:alt" content="{alt}">'
+              f'<meta name="twitter:image" content="{social}">'
+              f'<meta name="twitter:image:alt" content="{alt}">'
+          )
+          anchor = '<meta name="twitter:description" content="Fresh-baked cookies, brownies, banana loaf and Basque cheesecake in San Fernando, Pampanga.">'
+          if anchor not in html:
+              raise SystemExit('Twitter description anchor not found')
+          html = html.replace(anchor, anchor + social_meta, 1)
+
+          # Make structured data use the high-resolution branded image while preserving the SVG logo field.
+          html = html.replace(
+              f'"image":"{base}logo.svg"',
+              f'"image":"{base}bale-bella-social-share.png"',
+              1,
+          )
+
+          share_dialog = f'''<dialog id="shareDialog" class="share-dialog" aria-labelledby="shareDialogTitle"><form method="dialog" class="share-dialog-shell"><div class="dialog-head"><div><b id="shareDialogTitle">Share Bale Bella</b><small>Choose where you want to share our menu.</small></div><button class="share-close" aria-label="Close share menu">×</button></div><div class="share-preview"><img src="bale-bella-social-share.png" alt="{alt}"><div><b>Bale Bella Bakehouse</b><small>Fresh bakes in San Fernando, Pampanga.</small></div></div><div class="share-grid"><button type="button" class="share-option" data-share-platform="facebook"><span>f</span><b>Facebook</b></button><button type="button" class="share-option" data-share-platform="x"><span>𝕏</span><b>X</b></button><button type="button" class="share-option" data-share-platform="pinterest"><span>P</span><b>Pinterest</b></button><button type="button" class="share-option" data-share-platform="whatsapp"><span>💬</span><b>WhatsApp</b></button><button type="button" class="share-option share-wide" data-share-platform="native"><span>↗</span><b>Instagram / TikTok / More</b><small>Opens your device share sheet</small></button><button type="button" class="share-option share-wide" data-share-platform="copy"><span>🔗</span><b>Copy menu link</b></button></div></form></dialog>'''
+          if 'id="shareDialog"' not in html:
+              marker = '<noscript>'
+              if marker not in html:
+                  raise SystemExit('noscript marker not found')
+              html = html.replace(marker, share_dialog + marker, 1)
+
+          html_path.write_text(html, encoding='utf-8')
+
+          css_path = Path('site.css')
+          css = css_path.read_text(encoding='utf-8')
+          css += '''\n.share-dialog{width:min(620px,calc(100% - 28px));border:0;border-radius:28px;padding:0;background:transparent;max-height:90vh}.share-dialog::backdrop{background:rgba(43,34,29,.58);backdrop-filter:blur(5px)}.share-dialog-shell{background:var(--paper);border:1px solid var(--line);border-radius:28px;padding:22px;box-shadow:0 28px 80px rgba(43,34,29,.28)}.share-dialog .dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:17px}.share-dialog .dialog-head b{display:block;color:var(--cocoa);font-size:1.25rem}.share-dialog .dialog-head small{display:block;color:var(--muted);margin-top:3px}.share-close{border:1px solid var(--line);background:#fff;width:38px;height:38px;border-radius:50%;font-size:1.35rem;color:var(--cocoa)}.share-preview{display:flex;align-items:center;gap:14px;background:var(--paper2);border:1px solid var(--line);border-radius:18px;padding:10px;margin-bottom:15px}.share-preview img{width:118px;aspect-ratio:1200/630;object-fit:cover;border-radius:12px;border:1px solid var(--line)}.share-preview b{display:block;color:var(--cocoa)}.share-preview small{display:block;color:var(--muted);margin-top:3px}.share-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.share-option{border:1px solid var(--line);background:#fff;border-radius:16px;padding:13px;text-align:left;color:var(--cocoa);display:grid;grid-template-columns:34px 1fr;align-items:center;gap:10px;transition:transform .18s,box-shadow .18s,border-color .18s}.share-option:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm);border-color:#d9c2a8}.share-option>span{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--butter-soft);font-weight:950}.share-option>b{font-size:.9rem}.share-option>small{grid-column:2;color:var(--muted);margin-top:-7px}.share-wide{grid-column:1/-1}@media(max-width:520px){.share-dialog-shell{padding:16px}.share-preview img{width:92px}.share-grid{grid-template-columns:1fr}.share-wide{grid-column:auto}}'''
+          css_path.write_text(css, encoding='utf-8')
+
+          js_path = Path('site.js')
+          js = js_path.read_text(encoding='utf-8')
+          js += '''\nfunction socialShareData(){const e=(document.querySelector('link[rel="canonical"]')?.href||location.href.split("#")[0]),t="Fresh-baked sweets from Bale Bella Bakehouse in San Fernando, Pampanga 🍪",a=new URL("bale-bella-social-share.png",e).href,r=new URL("bale-bella-pinterest-share.png",e).href;return{url:e,text:t,title:"Bale Bella Bakehouse",image:a,pinterestImage:r}}function openShareUrl(e){const t=window.open(e,"_blank","noopener,noreferrer");if(t)try{t.opener=null}catch{}}async function nativeSocialShare(e=!1){const t=socialShareData();if(!navigator.share)return copySocialLink();let a={title:t.title,text:t.text,url:t.url};if(e&&navigator.canShare&&window.File)try{const e=await fetch(t.image),r=await e.blob(),n=new File([r],"bale-bella-bakehouse.png",{type:"image/png"}),o={...a,files:[n]};navigator.canShare(o)&&(a=o)}catch{}try{await navigator.share(a)}catch(e){if("AbortError"!==e.name)await copySocialLink()}}async function copySocialLink(){const e=socialShareData().url;toast(await copyOrderText(e)?"Bale Bella menu link copied ✓":"Could not copy link.")}function shareMenu(){const e=$("shareDialog");e&&"function"==typeof e.showModal?e.showModal():nativeSocialShare(!0)}async function shareToPlatform(e){const t=socialShareData(),a=encodeURIComponent(t.url),r=encodeURIComponent(t.text),n=encodeURIComponent(t.pinterestImage);"facebook"===e?openShareUrl(`https://www.facebook.com/sharer/sharer.php?u=${a}`):"x"===e?openShareUrl(`https://twitter.com/intent/tweet?text=${r}&url=${a}`):"pinterest"===e?openShareUrl(`https://www.pinterest.com/pin/create/button/?url=${a}&media=${n}&description=${r}`):"whatsapp"===e?openShareUrl(`https://wa.me/?text=${encodeURIComponent(t.text+" "+t.url)}`):"native"===e?await nativeSocialShare(!0):"copy"===e&&await copySocialLink();const o=$("shareDialog");o?.open&&o.close()}document.addEventListener("DOMContentLoaded",()=>{const e=$("shareDialog");e&&(e.addEventListener("click",async e=>{const t=e.target.closest("[data-share-platform]");t&&await shareToPlatform(t.dataset.sharePlatform)}),e.addEventListener("click",t=>{t.target===e&&e.close()}))});'''
+          js_path.write_text(js, encoding='utf-8')
+
+      - name: Minify production files
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes terser@5.44.0 site.js --compress --mangle --comments false --output /tmp/site.js
+          npx --yes clean-css-cli@5.6.3 -O2 -o /tmp/site.css site.css
+          npx --yes html-minifier-terser@7.2.0 index.html \
+            --collapse-whitespace \
+            --conservative-collapse \
+            --remove-comments \
+            --remove-redundant-attributes \
+            --remove-script-type-attributes \
+            --remove-style-link-type-attributes \
+            --use-short-doctype \
+            -o /tmp/index.html
+
+          printf '%s\n' '<!-- Author: Johnpel Quingua <johnpelquingua@gmail.com> -->' > index.html
+          cat /tmp/index.html >> index.html
+          printf '%s\n' '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */' > site.css
+          cat /tmp/site.css >> site.css
+          printf '%s\n' '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */' > site.js
+          cat /tmp/site.js >> site.js
+
+      - name: Validate social sharing production output
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check site.js
+          python - <<'PY'
+          from PIL import Image
+          for name, dims in [('bale-bella-social-share.png',(1200,630)),('bale-bella-pinterest-share.png',(1000,1500))]:
+              im=Image.open(name)
+              assert im.size == dims, (name, im.size)
+              assert im.format == 'PNG', (name, im.format)
+              print(name, im.size, Path(name).stat().st_size if False else '')
+          PY
+          grep -q 'property="og:image" content="https://johnpelquingua.github.io/bale-bella-bakehouse/bale-bella-social-share.png?v=1"' index.html
+          grep -q 'property="og:image:width" content="1200"' index.html
+          grep -q 'property="og:image:height" content="630"' index.html
+          grep -q 'name="twitter:card" content="summary_large_image"' index.html
+          grep -q 'name="twitter:image:alt"' index.html
+          grep -q 'id="shareDialog"' index.html
+          grep -q 'data-share-platform="facebook"' index.html
+          grep -q 'data-share-platform="pinterest"' index.html
+          grep -q 'data-share-platform="native"' index.html
+          grep -q 'facebook.com/sharer' site.js
+          grep -q 'twitter.com/intent/tweet' site.js
+          grep -q 'pinterest.com/pin/create/button' site.js
+          grep -q 'navigator.share' site.js
+          grep -q 'bale-bella-social-share.png' site.js
+
+      - name: Commit social assets and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/social-share-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html site.css site.js bale-bella-social-share.png bale-bella-pinterest-share.png .github/workflows/social-share-patch.yml
+          git commit -m 'Add optimized social previews and share menu'
+          git push origin HEAD:main
