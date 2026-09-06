@@ -1,0 +1,55 @@
+name: Soft Launch Patch
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - name: Add soft-launch messaging
+        shell: python
+        run: |
+          from pathlib import Path
+
+          css = Path('site.css')
+          text = css.read_text(encoding='utf-8')
+          marker = '/* BALE-BELLA-SOFT-LAUNCH-V1 */'
+          if marker not in text:
+              text += r'''
+
+/* BALE-BELLA-SOFT-LAUNCH-V1 */
+header::after{content:"SOFT LAUNCH  ✦  We’re quietly warming up the ovens. Full ordering opens soon — for now, enjoy a first look at Bale Bella.";display:block;width:100%;padding:9px 18px;text-align:center;background:linear-gradient(90deg,#6f4027,#8f6042,#6f4027);background-size:200% 100%;color:#fff8ec;font-size:.76rem;font-weight:850;letter-spacing:.025em;line-height:1.45;box-shadow:0 7px 18px rgba(73,49,31,.08);animation:softLaunchGlow 8s ease-in-out infinite}
+.hero .eyebrow{font-size:0;background:#fff4d9;border-color:#edcf8d}
+.hero .eyebrow .status-dot{display:none}
+.hero .eyebrow::before{content:"✦";font-size:.78rem;animation:softLaunchTwinkle 2.6s ease-in-out infinite}
+.hero .eyebrow::after{content:"Soft launch · First look only · Full orders opening soon";font-size:.78rem;font-weight:900;color:var(--cocoa)}
+.hero-copy::after{content:" We’re currently in soft launch while we fine-tune our bakes, packaging and ordering experience. We’ll be accepting orders in full very soon.";font-weight:650;color:var(--cocoa)}
+@keyframes softLaunchGlow{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
+@keyframes softLaunchTwinkle{0%,100%{opacity:.45;transform:scale(.9) rotate(0)}50%{opacity:1;transform:scale(1.16) rotate(14deg)}}
+@media(max-width:650px){header::after{font-size:.69rem;padding:8px 13px}.hero .eyebrow{max-width:100%;line-height:1.35}.hero .eyebrow::after{font-size:.72rem}}
+body.motion-off header::after,body.motion-off .hero .eyebrow::before{animation:none!important}
+'''
+              css.write_text(text, encoding='utf-8')
+      - name: Commit soft-launch notice
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Soft-launch notice already present."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site.css
+          git commit -m "Add soft launch notice"
+          git push origin HEAD:main
