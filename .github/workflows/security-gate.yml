@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout source read-only
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -44,7 +44,7 @@ jobs:
           fi
           echo 'No forbidden secret/private-key files found.'
 
-      - name: Scan public source for high-confidence secrets
+      - name: Scan published source for high-confidence secrets
         shell: python
         run: |
           from pathlib import Path
@@ -97,30 +97,10 @@ jobs:
           html = Path('index.html').read_text(encoding='utf-8')
           errors = []
 
-          csp_match = re.search(
-              r'<meta[^>]+http-equiv=["\']Content-Security-Policy["\'][^>]+content=["\']([^"\']+)',
-              html,
-              re.I,
-          )
-          if not csp_match:
-              errors.append('Missing Content-Security-Policy meta policy')
-          else:
-              csp = csp_match.group(1).lower()
-              required = [
-                  "default-src 'self'",
-                  "script-src 'self'",
-                  "object-src 'none'",
-                  "base-uri 'self'",
-                  "form-action 'self'",
-                  'upgrade-insecure-requests',
-              ]
-              for directive in required:
-                  if directive not in csp:
-                      errors.append(f'CSP missing required directive: {directive}')
-
-          class ScriptAudit(HTMLParser):
+          class SecurityAudit(HTMLParser):
               def __init__(self):
                   super().__init__()
+                  self.csp = None
                   self.in_script = False
                   self.script_type = ''
                   self.script_src = None
@@ -130,13 +110,19 @@ jobs:
 
               def handle_starttag(self, tag, attrs):
                   attrs = dict(attrs)
-                  if tag.lower() == 'script':
+                  tag = tag.lower()
+
+                  if tag == 'meta' and attrs.get('http-equiv', '').lower() == 'content-security-policy':
+                      self.csp = attrs.get('content', '')
+
+                  if tag == 'script':
                       self.in_script = True
                       self.script_type = attrs.get('type', '').lower()
                       self.script_src = attrs.get('src')
                       self.inline_chunks = []
                       if self.script_src:
                           self.external_scripts.append(self.script_src)
+
                   for key in attrs:
                       if key.lower().startswith('on'):
                           errors.append(f'Inline event handler found: {key}=')
@@ -156,8 +142,24 @@ jobs:
                       self.script_src = None
                       self.inline_chunks = []
 
-          audit = ScriptAudit()
+          audit = SecurityAudit()
           audit.feed(html)
+
+          if not audit.csp:
+              errors.append('Missing Content-Security-Policy meta policy')
+          else:
+              csp = audit.csp.lower()
+              required = [
+                  "default-src 'self'",
+                  "script-src 'self'",
+                  "object-src 'none'",
+                  "base-uri 'self'",
+                  "form-action 'self'",
+                  'upgrade-insecure-requests',
+              ]
+              for directive in required:
+                  if directive not in csp:
+                      errors.append(f'CSP missing required directive: {directive}')
 
           if audit.executable_inline:
               errors.append('Executable inline JavaScript found; keep executable JS in site.js')
