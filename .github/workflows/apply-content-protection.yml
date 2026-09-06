@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/apply-content-protection.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -37,7 +38,7 @@ jobs:
 
           css_marker = 'body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}'
           if css_marker not in css:
-              css = css.rstrip() + '\n' + 'body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,select,[contenteditable="true"],#manualCopyText{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}img{-webkit-user-drag:none} @media print{html,body{background:#fff!important}body>*{display:none!important}body::before{display:block!important;content:"Printing is disabled for Bale Bella Bakehouse content.";font:700 18px/1.5 system-ui,sans-serif;color:#3f2a1e;padding:40px}}\n'
+              css = css.rstrip() + '\n' + 'body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,select,[contenteditable="true"],#manualCopyText{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}img{-webkit-user-drag:none}@media print{html,body{background:#fff!important}body>*{display:none!important}body::before{display:block!important;content:"Printing is disabled for Bale Bella Bakehouse content.";font:700 18px/1.5 system-ui,sans-serif;color:#3f2a1e;padding:40px}}\n'
 
           js_path.write_text(js, encoding='utf-8')
           css_path.write_text(css, encoding='utf-8')
