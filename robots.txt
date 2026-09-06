@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://johnpelquingua.github.io/bale-bella-bakehouse/sitemap.xml
+Sitemap: https://balebellabakehouse.com/sitemap.xml

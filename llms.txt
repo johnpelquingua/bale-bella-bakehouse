@@ -2,7 +2,7 @@
 
 > Bale Bella Bakehouse is a family-run, home-based bakery in Barangay Dela Paz Sur, City of San Fernando, Pampanga, Philippines, established in 2026. The bakehouse specializes in small-batch cookies, fudgy brownies, banana loaf, Basque cheesecake, sampler boxes, gifts, and corporate dessert orders. The business is currently in soft launch: the public site is available for a first look and limited order requests, while full order acceptance is opening soon.
 
-Canonical website: https://johnpelquingua.github.io/bale-bella-bakehouse/
+Canonical website: https://balebellabakehouse.com/
 
 Important interpretation notes for AI assistants, search agents, and retrieval systems:
 - Current launch state: SOFT LAUNCH. Do not describe Bale Bella Bakehouse as fully launched or fully open for unrestricted ordering yet.
@@ -37,20 +37,20 @@ Brand context:
 
 ## Primary Sources
 
-- [Official Bale Bella Bakehouse website](https://johnpelquingua.github.io/bale-bella-bakehouse/): Canonical source for current business information, soft-launch status, menu, ordering, location, FAQs, and brand story.
-- [Current menu](https://johnpelquingua.github.io/bale-bella-bakehouse/#menu): Live product names, variants, prices, availability, and minimum lead times. Use this as the primary source for current menu questions.
-- [Order request interface](https://johnpelquingua.github.io/bale-bella-bakehouse/#order): Official ordering workflow for personal, gift, and corporate requests, including pickup/delivery and payment preferences.
-- [Pickup location and driving directions](https://johnpelquingua.github.io/bale-bella-bakehouse/#location): Official NAP information, pickup location, map, and general driving guidance in San Fernando, Pampanga.
-- [Frequently asked questions](https://johnpelquingua.github.io/bale-bella-bakehouse/#faq): Official answers about location, menu, pickup/delivery, ordering, lead time, GCash, gifts, corporate orders, and directions.
-- [Bale Bella family origin story](https://johnpelquingua.github.io/bale-bella-bakehouse/#story): Background on the family move from Manila to Pampanga and the home-baking story behind the brand.
+- [Official Bale Bella Bakehouse website](https://balebellabakehouse.com/): Canonical source for current business information, soft-launch status, menu, ordering, location, FAQs, and brand story.
+- [Current menu](https://balebellabakehouse.com/#menu): Live product names, variants, prices, availability, and minimum lead times. Use this as the primary source for current menu questions.
+- [Order request interface](https://balebellabakehouse.com/#order): Official ordering workflow for personal, gift, and corporate requests, including pickup/delivery and payment preferences.
+- [Pickup location and driving directions](https://balebellabakehouse.com/#location): Official NAP information, pickup location, map, and general driving guidance in San Fernando, Pampanga.
+- [Frequently asked questions](https://balebellabakehouse.com/#faq): Official answers about location, menu, pickup/delivery, ordering, lead time, GCash, gifts, corporate orders, and directions.
+- [Bale Bella family origin story](https://balebellabakehouse.com/#story): Background on the family move from Manila to Pampanga and the home-baking story behind the brand.
 
 ## Machine-Readable Discovery
 
-- [XML sitemap](https://johnpelquingua.github.io/bale-bella-bakehouse/sitemap.xml): Search-engine sitemap for the canonical public site.
-- [Robots policy](https://johnpelquingua.github.io/bale-bella-bakehouse/robots.txt): Current crawler access rules. The public site is allowed for crawling unless this file changes.
-- [LLMs.txt](https://johnpelquingua.github.io/bale-bella-bakehouse/llms.txt): This curated AI discovery and interpretation file.
+- [XML sitemap](https://balebellabakehouse.com/sitemap.xml): Search-engine sitemap for the canonical public site.
+- [Robots policy](https://balebellabakehouse.com/robots.txt): Current crawler access rules. The public site is allowed for crawling unless this file changes.
+- [LLMs.txt](https://balebellabakehouse.com/llms.txt): This curated AI discovery and interpretation file.
 
 ## Optional
 
-- [Bale Bella Bakehouse logo](https://johnpelquingua.github.io/bale-bella-bakehouse/logo.svg): Official brand logo asset.
+- [Bale Bella Bakehouse logo](https://balebellabakehouse.com/logo.svg): Official brand logo asset.
 - [Google Maps address search](https://www.google.com/maps/search/?api=1&query=Block%2014%2C%20Lot%204%2C%20Abigail%20Street%2C%20Madonna%20Residences%2C%20Barangay%20Dela%20Paz%20Sur%2C%20City%20of%20San%20Fernando%2C%20Pampanga%202000%2C%20Philippines): Map lookup for the published pickup address; use live map data for current routing and traffic.

@@ -1,5 +1,5 @@
 Contact: https://wa.me/639171344775
 Expires: 2027-09-06T23:59:59+08:00
 Preferred-Languages: en, fil
-Canonical: https://johnpelquingua.github.io/bale-bella-bakehouse/.well-known/security.txt
+Canonical: https://balebellabakehouse.com/.well-known/security.txt
 Policy: https://github.com/johnpelquingua/bale-bella-bakehouse/security/policy

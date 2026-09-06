@@ -4,7 +4,7 @@
 
 The only official Bale Bella Bakehouse ordering site for this repository is:
 
-https://johnpelquingua.github.io/bale-bella-bakehouse/
+https://balebellabakehouse.com/
 
 ## Reporting a security issue
 
