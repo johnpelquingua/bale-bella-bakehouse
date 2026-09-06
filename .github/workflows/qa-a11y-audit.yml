@@ -1,0 +1,195 @@
+name: Temporary WCAG and Functional QA Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/qa-a11y-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install isolated QA tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bb-qa
+          cd /tmp/bb-qa
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run functional and WCAG 2.2 AA browser QA
+        shell: bash
+        env:
+          NODE_PATH: /tmp/bb-qa/node_modules
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/bb-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          sleep 1
+
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const AxeBuilder = require('@axe-core/playwright').default;
+
+          const BASE = 'http://127.0.0.1:4173/';
+          const failures = [];
+          const notes = [];
+          const a11yViolations = [];
+          const check = (condition, message) => {
+            if (!condition) failures.push(message);
+            console.log(`${condition ? 'PASS' : 'FAIL'}: ${message}`);
+          };
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            try {
+              for (const viewport of [
+                { name: 'desktop', width: 1440, height: 1000 },
+                { name: 'mobile', width: 390, height: 844 }
+              ]) {
+                console.log(`\n=== ${viewport.name.toUpperCase()} ${viewport.width}x${viewport.height} ===`);
+                const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+                const page = await context.newPage();
+                const pageErrors = [];
+                page.on('pageerror', e => pageErrors.push(e.message));
+                await page.addInitScript(() => {
+                  window.__openedUrl = '';
+                  window.open = (url) => {
+                    window.__openedUrl = String(url || '');
+                    return { opener: null };
+                  };
+                  localStorage.removeItem('bb_cart');
+                  sessionStorage.removeItem('bb_order_ref');
+                });
+                await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+                await page.waitForSelector('#menuGrid .card');
+
+                check(pageErrors.length === 0, `${viewport.name}: no uncaught JavaScript errors${pageErrors.length ? ' — ' + pageErrors.join(' | ') : ''}`);
+                check(await page.locator('h1').count() === 1, `${viewport.name}: exactly one H1`);
+                check(await page.locator('main').count() === 1, `${viewport.name}: main landmark present`);
+                check(await page.locator('nav[aria-label="Main navigation"]').count() === 1, `${viewport.name}: labelled main navigation present`);
+                check(await page.locator('img:not([alt])').count() === 0, `${viewport.name}: all img elements have alt attributes`);
+                check(await page.locator('iframe:not([title])').count() === 0, `${viewport.name}: all iframes have titles`);
+
+                // Keyboard bypass check.
+                await page.locator('body').focus();
+                await page.keyboard.press('Tab');
+                const firstFocusClass = await page.evaluate(() => document.activeElement?.className || '');
+                check(String(firstFocusClass).includes('skip-link'), `${viewport.name}: first keyboard focus reaches skip link`);
+
+                // Menu filtering.
+                const allCards = await page.locator('#menuGrid .card').count();
+                check(allCards === 9, `${viewport.name}: all 9 menu products render`);
+                await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+                const cookieCards = await page.locator('#menuGrid .card').count();
+                check(cookieCards === 4, `${viewport.name}: Cookies filter renders 4 products`);
+                await page.getByRole('button', { name: 'All', exact: true }).click();
+
+                // Cart add, persistence and quantity.
+                await page.locator('[data-add="mayumu"]').click();
+                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: adding a product increments cart count`);
+                const storedCart = await page.evaluate(() => localStorage.getItem('bb_cart'));
+                check(Boolean(storedCart && storedCart.includes('mayumu')), `${viewport.name}: cart persists to localStorage`);
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                await page.waitForSelector('#menuGrid .card');
+                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: cart restores after reload`);
+                await page.locator('#cartList [data-delta="1"]').first().click();
+                check((await page.locator('#cartCount').textContent()).trim() === '2', `${viewport.name}: quantity increment works`);
+                await page.locator('#cartList [data-delta="-1"]').first().click();
+                check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: quantity decrement works`);
+
+                // Fulfillment, order type and payment modes.
+                await page.locator('[data-mode="delivery"]').click();
+                check(!(await page.locator('#addressField').evaluate(el => el.hidden)), `${viewport.name}: Delivery reveals address field`);
+                check(await page.locator('[data-mode="delivery"]').getAttribute('aria-pressed') === 'true', `${viewport.name}: Delivery toggle exposes selected state`);
+                await page.locator('[data-order-type="gift"]').click();
+                check(!(await page.locator('#giftFields').evaluate(el => el.hidden)), `${viewport.name}: Gift reveals recipient fields`);
+                check(await page.locator('#recipientName').evaluate(el => el.required), `${viewport.name}: Gift recipient becomes required`);
+                await page.locator('[data-order-type="personal"]').click();
+                await page.locator('[data-payment="Bank transfer"]').click();
+                check(await page.locator('#gcashCard').evaluate(el => el.hidden), `${viewport.name}: non-GCash payment hides GCash instructions`);
+                check((await page.locator('#paymentSummary').textContent()).trim() === 'Bank transfer', `${viewport.name}: payment summary updates`);
+                await page.locator('[data-payment="GCash"]').click();
+
+                // Validation and WhatsApp payload generation.
+                await page.locator('#customerName').fill('QA Tester');
+                await page.locator('#customerPhone').fill('123');
+                await page.locator('[data-mode="pickup"]').click();
+                await page.locator('#sendBtn').click();
+                check(await page.locator('#customerPhone').getAttribute('aria-invalid') === 'true', `${viewport.name}: invalid phone is identified accessibly`);
+                check(await page.locator('#customerPhone').evaluate(el => el === document.activeElement), `${viewport.name}: validation focuses first invalid field`);
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#sendBtn').click();
+                const openedUrl = await page.evaluate(() => window.__openedUrl);
+                check(openedUrl.startsWith('https://wa.me/639171344775?text='), `${viewport.name}: valid order builds WhatsApp URL`);
+                check(decodeURIComponent(openedUrl).includes('Mayumu Chunk'), `${viewport.name}: WhatsApp payload includes cart item`);
+                check(decodeURIComponent(openedUrl).includes('QA Tester'), `${viewport.name}: WhatsApp payload includes customer name`);
+
+                // Share dialog opens and closes by keyboard.
+                await page.locator('#shareBtn').click();
+                check(await page.locator('#shareDialog').evaluate(el => el.open), `${viewport.name}: share dialog opens`);
+                check(await page.locator('#shareDialog').evaluate(el => el.contains(document.activeElement)), `${viewport.name}: focus enters modal dialog`);
+                await page.keyboard.press('Escape');
+                check(!(await page.locator('#shareDialog').evaluate(el => el.open)), `${viewport.name}: Escape closes share dialog`);
+
+                // Automated WCAG checks.
+                const results = await new AxeBuilder({ page })
+                  .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice'])
+                  .analyze();
+                if (results.violations.length) {
+                  console.log(`\nA11Y VIOLATIONS (${viewport.name}): ${results.violations.length}`);
+                  for (const v of results.violations) {
+                    const item = {
+                      viewport: viewport.name,
+                      id: v.id,
+                      impact: v.impact,
+                      help: v.help,
+                      nodes: v.nodes.map(n => ({ target: n.target, html: n.html, summary: n.failureSummary }))
+                    };
+                    a11yViolations.push(item);
+                    console.log(`- [${v.impact}] ${v.id}: ${v.help}`);
+                    for (const n of v.nodes) {
+                      console.log(`    target: ${n.target.join(' ')}`);
+                      console.log(`    ${String(n.failureSummary || '').replace(/\n/g, ' ')}`);
+                    }
+                  }
+                } else {
+                  console.log(`PASS: ${viewport.name}: axe WCAG 2.2 AA/best-practice scan found no violations`);
+                }
+                await context.close();
+              }
+            } finally {
+              await browser.close();
+            }
+
+            console.log('\n=== QA SUMMARY ===');
+            console.log(`Functional failures: ${failures.length}`);
+            console.log(`Axe violations: ${a11yViolations.length}`);
+            if (failures.length) {
+              console.log('\nFUNCTIONAL FAILURES');
+              failures.forEach(f => console.log(`- ${f}`));
+            }
+            if (a11yViolations.length) {
+              console.log('\nAXE IDS');
+              [...new Set(a11yViolations.map(v => v.id))].forEach(id => console.log(`- ${id}`));
+            }
+            if (failures.length || a11yViolations.length) process.exit(1);
+          })().catch(err => {
+            console.error(err);
+            process.exit(1);
+          });
+          NODE
