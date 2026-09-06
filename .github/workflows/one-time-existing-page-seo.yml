@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm tools/optimize-existing-pages.py tools/qa-existing-pages.py .github/workflows/one-time-existing-page-seo.yml
+          git rm -f tools/optimize-existing-pages.py tools/qa-existing-pages.py .github/workflows/one-time-existing-page-seo.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
