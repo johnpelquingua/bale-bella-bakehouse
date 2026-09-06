@@ -1,0 +1,126 @@
+name: Post-Protection Functional and Accessibility QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/content-protection-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install browser QA tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bb-protection-qa && cd /tmp/bb-protection-qa
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+      - name: Test protection, ordering, sharing and WCAG 2.2 AA
+        shell: bash
+        env:
+          NODE_PATH: /tmp/bb-protection-qa/node_modules
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/bb-http.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          sleep 1
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const AxeBuilder = require('@axe-core/playwright').default;
+          const failures=[];
+          const check=(ok,msg)=>{console.log(`${ok?'PASS':'FAIL'}: ${msg}`); if(!ok) failures.push(msg)};
+          const BASE='http://127.0.0.1:4173/';
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              for(const vp of [{n:'desktop',w:1440,h:1000},{n:'mobile',w:390,h:844},{n:'narrow-320',w:320,h:900}]){
+                console.log(`\n=== ${vp.n} ===`);
+                const ctx=await browser.newContext({viewport:{width:vp.w,height:vp.h}});
+                const page=await ctx.newPage();
+                const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+                await page.addInitScript(()=>{window.__openedUrl='';window.open=url=>{window.__openedUrl=String(url||'');return{opener:null}};window.confirm=()=>true;});
+                await page.goto(BASE,{waitUntil:'domcontentloaded'});
+                await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});
+                await page.reload({waitUntil:'domcontentloaded'});
+                await page.waitForSelector('#menuGrid .card');
+                check(errors.length===0,`${vp.n}: no uncaught JavaScript errors`);
+                check(await page.locator('#menuGrid .card').count()===9,`${vp.n}: all 9 products render`);
+
+                const protection=await page.evaluate(()=>{
+                  const body=document.body,input=document.querySelector('#customerName');
+                  const cm=new MouseEvent('contextmenu',{bubbles:true,cancelable:true}); body.dispatchEvent(cm);
+                  const cp=new ClipboardEvent('copy',{bubbles:true,cancelable:true}); body.dispatchEvent(cp);
+                  const cmInput=new MouseEvent('contextmenu',{bubbles:true,cancelable:true}); input.dispatchEvent(cmInput);
+                  const copyInput=new ClipboardEvent('copy',{bubbles:true,cancelable:true}); input.dispatchEvent(copyInput);
+                  const kd=new KeyboardEvent('keydown',{key:'u',ctrlKey:true,bubbles:true,cancelable:true}); document.dispatchEvent(kd);
+                  return {
+                    bodySelect:getComputedStyle(body).userSelect,
+                    inputSelect:getComputedStyle(input).userSelect,
+                    contextBlocked:cm.defaultPrevented,
+                    copyBlocked:cp.defaultPrevented,
+                    inputContextAllowed:!cmInput.defaultPrevented,
+                    inputCopyAllowed:!copyInput.defaultPrevented,
+                    sourceShortcutBlocked:kd.defaultPrevented,
+                    imagesUndraggable:[...document.images].every(i=>i.getAttribute('draggable')==='false'),
+                    protectionFn:typeof window.initContentProtection==='function'
+                  };
+                });
+                check(protection.bodySelect==='none',`${vp.n}: ordinary page text selection disabled`);
+                check(protection.inputSelect==='text',`${vp.n}: form text remains selectable/editable`);
+                check(protection.contextBlocked,`${vp.n}: page context menu blocked`);
+                check(protection.copyBlocked,`${vp.n}: page copy event blocked`);
+                check(protection.inputContextAllowed,`${vp.n}: form context menu remains available`);
+                check(protection.inputCopyAllowed,`${vp.n}: form copy remains available`);
+                check(protection.sourceShortcutBlocked,`${vp.n}: Ctrl/Cmd+U source shortcut deterred`);
+                check(protection.imagesUndraggable,`${vp.n}: images are non-draggable`);
+                check(protection.protectionFn,`${vp.n}: content protection initialized`);
+
+                await page.locator('[data-add="mayumu"]').click();
+                check((await page.locator('#cartCount').textContent()).trim()==='1',`${vp.n}: add-to-cart still works`);
+                await page.locator('[data-order-type="gift"]').click();
+                check(!(await page.locator('#giftFields').evaluate(el=>el.hidden)),`${vp.n}: Gift mode still works`);
+                await page.locator('[data-order-type="corporate"]').click();
+                check(!(await page.locator('#corporateFields').evaluate(el=>el.hidden)),`${vp.n}: Corporate mode still works`);
+                await page.locator('[data-order-type="personal"]').click();
+                await page.locator('#customerName').fill('QA Tester');
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#sendBtn').click();
+                const orderUrl=await page.evaluate(()=>window.__openedUrl);
+                check(orderUrl.startsWith('https://wa.me/639171344775?text='),`${vp.n}: WhatsApp order generation still works`);
+                await page.locator('#shareBtn').click();
+                check(await page.locator('#shareDialog').evaluate(el=>el.open),`${vp.n}: share menu still opens`);
+                await page.keyboard.press('Escape');
+                check(!(await page.locator('#shareDialog').evaluate(el=>el.open)),`${vp.n}: share menu still closes with Escape`);
+
+                const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']).analyze();
+                check(axe.violations.length===0,`${vp.n}: axe WCAG 2.2 AA/best-practice has no violations`);
+                for(const v of axe.violations){console.log(`  A11Y [${v.impact}] ${v.id}: ${v.help}`);for(const n of v.nodes)console.log(`    ${n.target.join(' ')} :: ${String(n.failureSummary||'').replace(/\n/g,' ')}`)}
+                const noClip=await page.evaluate(()=>[...document.querySelectorAll('main a,main button,main input,main select,main textarea,main article,main h1,main h2,main h3')].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').every(el=>{const r=el.getBoundingClientRect();return r.width<=innerWidth+1&&r.right<=innerWidth+1&&r.left>=-1}));
+                check(noClip,`${vp.n}: no primary horizontal clipping`);
+                await ctx.close();
+              }
+            } finally {await browser.close()}
+            console.log(`\nFINAL FAILURES: ${failures.length}`); failures.forEach(f=>console.log(`- ${f}`)); if(failures.length)process.exit(1);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - name: Verify Cloudflare header contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "frame-ancestors 'none'" _headers
+          grep -F 'X-Frame-Options: DENY' _headers
+          grep -F 'X-Content-Type-Options: nosniff' _headers
+          grep -F 'Permissions-Policy:' _headers
+          grep -F 'Referrer-Policy:' _headers
