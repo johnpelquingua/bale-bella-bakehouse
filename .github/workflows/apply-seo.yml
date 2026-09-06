@@ -1,0 +1,33 @@
+name: Apply Bale Bella SEO upgrade
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'seo_patch.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-seo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Apply SEO and local search upgrades
+        run: python seo_patch.py
+
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet -- index.html robots.txt sitemap.xml; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html robots.txt sitemap.xml
+          git commit -m "Optimize Bale Bella for local SEO"
+          git push
