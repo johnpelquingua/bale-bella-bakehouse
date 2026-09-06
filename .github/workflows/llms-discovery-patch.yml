@@ -1,0 +1,48 @@
+name: LLMs Discovery Patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/llms-discovery-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - name: Advertise llms.txt in HTML head
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          marker = '<!-- LLMSTXT-DISCOVERY-V2 -->'
+          if marker not in text:
+              needle = '<link rel="canonical" href="https://johnpelquingua.github.io/bale-bella-bakehouse/">'
+              insert = needle + '\n' + marker + '\n<link rel="describedby" href="https://johnpelquingua.github.io/bale-bella-bakehouse/llms.txt" type="text/markdown">'
+              if needle not in text:
+                  raise SystemExit('Canonical link not found; refusing unsafe patch')
+              text = text.replace(needle, insert, 1)
+              p.write_text(text, encoding='utf-8')
+      - name: Commit discovery link
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "LLMs discovery link already present."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Advertise llms.txt for AI discovery"
+          git push origin HEAD:main
