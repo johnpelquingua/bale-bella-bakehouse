@@ -26,19 +26,17 @@ jobs:
           from pathlib import Path
           import re
 
-          author = 'Johnpel Quingua'
-
           html_path = Path('index.html')
           html = html_path.read_text(encoding='utf-8')
           html = re.sub(r'<!--.*?-->', '', html, flags=re.S)
           html = re.sub(
               r'<meta\s+name=["\']author["\']\s+content=["\'][^"\']*["\']\s*/?>',
-              f'<meta name="author" content="{author}">',
+              '<meta name="author" content="Johnpel Quingua">',
               html,
               count=1,
               flags=re.I,
           )
-          if '<meta name="author" content="Johnpel Quingua">' not in html:
+          if not re.search(r'<meta\s+name=["\']author["\']', html, re.I):
               html = html.replace('<meta name="description"', '<meta name="author" content="Johnpel Quingua"><meta name="description"', 1)
           html_path.write_text(html, encoding='utf-8')
 
@@ -65,31 +63,13 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          import re
           html = Path('index.html').read_text(encoding='utf-8')
           js = Path('site.js').read_text(encoding='utf-8')
-          required_html = [
-              'data-order-type="personal"',
-              'data-order-type="gift"',
-              'data-order-type="corporate"',
-              'id="giftFields"',
-              'id="corporateFields"',
-              'id="recipientName"',
-              'id="companyName"',
-              'id="guestCount"',
-          ]
+          required_html = ['data-order-type="personal"','data-order-type="gift"','data-order-type="corporate"','id="giftFields"','id="corporateFields"','id="recipientName"','id="companyName"','id="guestCount"']
           missing = [x for x in required_html if x not in html]
           if missing:
               raise SystemExit('Missing order-form contract: ' + ', '.join(missing))
-          required_js = [
-              'function setOrderPanel',
-              'setOrderPanel("giftFields",isGift)',
-              'setOrderPanel("corporateFields",isCorporate)',
-              'recipient.required=isGift',
-              'company.required=isCorporate',
-              'guests.required=isCorporate',
-              'field.disabled=!show',
-          ]
+          required_js = ['function setOrderPanel','setOrderPanel("giftFields",isGift)','setOrderPanel("corporateFields",isCorporate)','recipient.required=isGift','company.required=isCorporate','guests.required=isCorporate','field.disabled=!show']
           missing = [x for x in required_js if x not in js]
           if missing:
               raise SystemExit('Missing dynamic order logic: ' + ', '.join(missing))
@@ -101,16 +81,7 @@ jobs:
           set -euo pipefail
           npx --yes terser@5.44.0 site.js --compress --mangle --comments false --output /tmp/site.js
           npx --yes clean-css-cli@5.6.3 -O2 -o /tmp/site.css site.css
-          npx --yes html-minifier-terser@7.2.0 index.html \
-            --collapse-whitespace \
-            --conservative-collapse \
-            --remove-comments \
-            --remove-redundant-attributes \
-            --remove-script-type-attributes \
-            --remove-style-link-type-attributes \
-            --use-short-doctype \
-            -o /tmp/index.html
-
+          npx --yes html-minifier-terser@7.2.0 index.html --collapse-whitespace --conservative-collapse --remove-comments --remove-redundant-attributes --remove-script-type-attributes --remove-style-link-type-attributes --use-short-doctype -o /tmp/index.html
           printf '%s\n' '<!-- Author: Johnpel Quingua <johnpelquingua@gmail.com> -->' > index.html
           cat /tmp/index.html >> index.html
           printf '%s\n' '/*! Author: Johnpel Quingua <johnpelquingua@gmail.com> */' > site.css
@@ -123,23 +94,48 @@ jobs:
         run: |
           set -euo pipefail
           node --check site.js
-          grep -q '<meta name="author" content="Johnpel Quingua">' index.html
-          grep -q '\[hidden\],.is-hidden{display:none!important}' site.css
-          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' index.html
-          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' site.css
-          grep -q 'Johnpel Quingua <johnpelquingua@gmail.com>' site.js
-          grep -q 'giftFields' site.js
-          grep -q 'corporateFields' site.js
-          grep -q 'aria-hidden' site.js
-          if grep -q 'SEO-LOCAL-V1\|LLMSTXT-DISCOVERY-V2\|BALE-BELLA-STORY-V1\|Static-site clickjacking fallback\|Defensive limits for public form fields\|Local SEO and location\|Bale Bella origin story' index.html site.css site.js; then
-            echo 'Legacy source comments remain.'
-            exit 1
-          fi
           python - <<'PY'
           from pathlib import Path
-          for name in ('index.html','site.css','site.js'):
-              text=Path(name).read_text(encoding='utf-8')
+          from html.parser import HTMLParser
+          import re
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          css = Path('site.css').read_text(encoding='utf-8')
+          js = Path('site.js').read_text(encoding='utf-8')
+          author = 'Johnpel Quingua <johnpelquingua@gmail.com>'
+
+          class MetaAudit(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.author = None
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == 'meta':
+                      d = dict(attrs)
+                      if d.get('name','').lower() == 'author':
+                          self.author = d.get('content')
+
+          audit = MetaAudit(); audit.feed(html)
+          errors = []
+          if audit.author != 'Johnpel Quingua': errors.append(f'Author meta incorrect: {audit.author!r}')
+          for name, text in [('index.html',html),('site.css',css),('site.js',js)]:
+              if author not in text: errors.append(f'Author banner missing from {name}')
+          compact_css = re.sub(r'\s+','',css)
+          if 'display:none!important' not in compact_css or '[hidden]' not in compact_css or '.is-hidden' not in compact_css:
+              errors.append('Forced hidden-state CSS missing')
+          for token in ('giftFields','corporateFields','aria-hidden','is-hidden'):
+              if token not in js: errors.append(f'Minified JS missing {token}')
+          legacy = ('SEO-LOCAL-V1','LLMSTXT-DISCOVERY-V2','BALE-BELLA-STORY-V1','Static-site clickjacking fallback','Defensive limits for public form fields','Local SEO and location','Bale Bella origin story')
+          for marker in legacy:
+              if marker in html or marker in css or marker in js: errors.append(f'Legacy comment marker remains: {marker}')
+          html_comments = re.findall(r'<!--(.*?)-->', html, re.S)
+          if any('Author: Johnpel Quingua' not in c for c in html_comments): errors.append('Non-author HTML comment remains')
+          css_js_comments = re.findall(r'/\*.*?\*/', css + '\n' + js, re.S)
+          if any('Author: Johnpel Quingua' not in c for c in css_js_comments): errors.append('Non-author CSS/JS comment remains')
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          for name,text in [('index.html',html),('site.css',css),('site.js',js)]:
               print(f'{name}: {len(text):,} bytes; {text.count(chr(10))+1} lines')
+          print('Production validation passed.')
           PY
 
       - name: Commit production files and remove temporary workflow
