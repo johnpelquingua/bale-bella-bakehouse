@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install isolated QA tooling
         shell: bash
@@ -47,7 +47,6 @@ jobs:
 
           const BASE = 'http://127.0.0.1:4173/';
           const failures = [];
-          const notes = [];
           const a11yViolations = [];
           const check = (condition, message) => {
             if (!condition) failures.push(message);
@@ -72,8 +71,11 @@ jobs:
                     window.__openedUrl = String(url || '');
                     return { opener: null };
                   };
-                  localStorage.removeItem('bb_cart');
-                  sessionStorage.removeItem('bb_order_ref');
+                  if (!sessionStorage.getItem('__bbQaInitialized')) {
+                    localStorage.removeItem('bb_cart');
+                    sessionStorage.removeItem('bb_order_ref');
+                    sessionStorage.setItem('__bbQaInitialized', '1');
+                  }
                 });
                 await page.goto(BASE, { waitUntil: 'domcontentloaded' });
                 await page.waitForSelector('#menuGrid .card');
@@ -85,13 +87,11 @@ jobs:
                 check(await page.locator('img:not([alt])').count() === 0, `${viewport.name}: all img elements have alt attributes`);
                 check(await page.locator('iframe:not([title])').count() === 0, `${viewport.name}: all iframes have titles`);
 
-                // Keyboard bypass check.
                 await page.locator('body').focus();
                 await page.keyboard.press('Tab');
                 const firstFocusClass = await page.evaluate(() => document.activeElement?.className || '');
                 check(String(firstFocusClass).includes('skip-link'), `${viewport.name}: first keyboard focus reaches skip link`);
 
-                // Menu filtering.
                 const allCards = await page.locator('#menuGrid .card').count();
                 check(allCards === 9, `${viewport.name}: all 9 menu products render`);
                 await page.getByRole('button', { name: 'Cookies', exact: true }).click();
@@ -99,7 +99,6 @@ jobs:
                 check(cookieCards === 4, `${viewport.name}: Cookies filter renders 4 products`);
                 await page.getByRole('button', { name: 'All', exact: true }).click();
 
-                // Cart add, persistence and quantity.
                 await page.locator('[data-add="mayumu"]').click();
                 check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: adding a product increments cart count`);
                 const storedCart = await page.evaluate(() => localStorage.getItem('bb_cart'));
@@ -112,7 +111,6 @@ jobs:
                 await page.locator('#cartList [data-delta="-1"]').first().click();
                 check((await page.locator('#cartCount').textContent()).trim() === '1', `${viewport.name}: quantity decrement works`);
 
-                // Fulfillment, order type and payment modes.
                 await page.locator('[data-mode="delivery"]').click();
                 check(!(await page.locator('#addressField').evaluate(el => el.hidden)), `${viewport.name}: Delivery reveals address field`);
                 check(await page.locator('[data-mode="delivery"]').getAttribute('aria-pressed') === 'true', `${viewport.name}: Delivery toggle exposes selected state`);
@@ -125,7 +123,6 @@ jobs:
                 check((await page.locator('#paymentSummary').textContent()).trim() === 'Bank transfer', `${viewport.name}: payment summary updates`);
                 await page.locator('[data-payment="GCash"]').click();
 
-                // Validation and WhatsApp payload generation.
                 await page.locator('#customerName').fill('QA Tester');
                 await page.locator('#customerPhone').fill('123');
                 await page.locator('[data-mode="pickup"]').click();
@@ -139,31 +136,23 @@ jobs:
                 check(decodeURIComponent(openedUrl).includes('Mayumu Chunk'), `${viewport.name}: WhatsApp payload includes cart item`);
                 check(decodeURIComponent(openedUrl).includes('QA Tester'), `${viewport.name}: WhatsApp payload includes customer name`);
 
-                // Share dialog opens and closes by keyboard.
                 await page.locator('#shareBtn').click();
                 check(await page.locator('#shareDialog').evaluate(el => el.open), `${viewport.name}: share dialog opens`);
                 check(await page.locator('#shareDialog').evaluate(el => el.contains(document.activeElement)), `${viewport.name}: focus enters modal dialog`);
                 await page.keyboard.press('Escape');
                 check(!(await page.locator('#shareDialog').evaluate(el => el.open)), `${viewport.name}: Escape closes share dialog`);
 
-                // Automated WCAG checks.
                 const results = await new AxeBuilder({ page })
                   .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice'])
                   .analyze();
                 if (results.violations.length) {
                   console.log(`\nA11Y VIOLATIONS (${viewport.name}): ${results.violations.length}`);
                   for (const v of results.violations) {
-                    const item = {
-                      viewport: viewport.name,
-                      id: v.id,
-                      impact: v.impact,
-                      help: v.help,
-                      nodes: v.nodes.map(n => ({ target: n.target, html: n.html, summary: n.failureSummary }))
-                    };
-                    a11yViolations.push(item);
+                    a11yViolations.push({ viewport: viewport.name, id: v.id, impact: v.impact });
                     console.log(`- [${v.impact}] ${v.id}: ${v.help}`);
                     for (const n of v.nodes) {
                       console.log(`    target: ${n.target.join(' ')}`);
+                      console.log(`    html: ${String(n.html || '').replace(/\n/g, ' ')}`);
                       console.log(`    ${String(n.failureSummary || '').replace(/\n/g, ' ')}`);
                     }
                   }
