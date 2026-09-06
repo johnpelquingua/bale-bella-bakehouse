@@ -69,3 +69,4 @@ jobs:
           git add index.html .github/workflows/ascii-logo-patch.yml
           git commit -m "Add Bale Bella ASCII logo source signature"
           git push
+# trigger existing workflow
