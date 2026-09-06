@@ -31,7 +31,7 @@ jobs:
               raise SystemExit('Could not extract V2 remediation Python block')
           script = textwrap.dedent(m.group(1))
 
-          old_motion = 'function setMotion(e){motionEnabled=e,document.body.classList.toggle("motion-off",!e),document.documentElement.style.scrollBehavior=e?"smooth":"auto";const t=$("motionBtn");t.setAttribute("aria-pressed",String(e)),t.querySelector(".motion-label").textContent=e?"Motion On":"Motion Off";try{localStorage.setItem("bb_motion",e?"on":"off")}catch{}}function initMotion(){let e=null;try{e=localStorage.getItem("bb_motion")}catch{}setMotion("off"!==e)}'
+          old_motion = 'function setMotion(e){motionEnabled=e,document.body.classList.toggle("motion-off",!e);const t=$("motionBtn");t.setAttribute("aria-pressed",String(e)),t.querySelector(".motion-label").textContent=e?"Motion On":"Motion Off";try{localStorage.setItem("bb_motion",e?"on":"off")}catch{}}function initMotion(){let e=null;try{e=localStorage.getItem("bb_motion")}catch{}setMotion("off"!==e)}'
           replacement = "old_motion = " + repr(old_motion) + "\nj = replace_once(j, old_motion, new_motion, 'motion replacement')"
           pattern = r"j, n = re\.subn\(r'function setMotion.*?\n\s*if n != 1: raise SystemExit\(f'motion replacement count \{n\}'\)"
           script, count = re.subn(pattern, lambda _: replacement, script, count=1, flags=re.S)
