@@ -1,0 +1,218 @@
+name: One-time Bale Bella SEO content refresh
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/one-time-seo-content-refresh.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Rebuild and verify refresh payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tools/bale-seo-payload.part{1,2,3,4,5,6} | tr -d '\r\n\t ' > /tmp/bale-seo-payload.b64
+          base64 --decode /tmp/bale-seo-payload.b64 > /tmp/bale-content.tar.gz
+          echo '7a42c0abd8ab1509816608e165ad24e1d20b76151e816f1a72a1dd028fce1bda  /tmp/bale-content.tar.gz' | sha256sum --check --strict
+
+      - name: Safely extract refreshed content
+        shell: python
+        run: |
+          from pathlib import Path
+          import tarfile
+
+          archive = Path('/tmp/bale-content.tar.gz')
+          with tarfile.open(archive, 'r:gz') as tar:
+              for member in tar.getmembers():
+                  p = Path(member.name)
+                  if p.is_absolute() or '..' in p.parts:
+                      raise SystemExit(f'Unsafe archive member: {member.name}')
+              tar.extractall('.')
+
+      - name: Validate content JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check content.js
+          if grep -En '\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(|document\.write[[:space:]]*\(' content.js; then
+            echo 'Dangerous JavaScript construct detected in content.js.'
+            exit 1
+          fi
+
+      - name: Run SEO, schema, accessibility and internal-link QA
+        shell: python
+        run: |
+          from pathlib import Path, PurePosixPath
+          from html.parser import HTMLParser
+          import json, re, sys, urllib.parse, xml.etree.ElementTree as ET
+
+          expected = {
+              'menu/index.html': 'https://balebellabakehouse.com/menu/',
+              'cookies/index.html': 'https://balebellabakehouse.com/cookies/',
+              'brownies/index.html': 'https://balebellabakehouse.com/brownies/',
+              'basque-cheesecake/index.html': 'https://balebellabakehouse.com/basque-cheesecake/',
+              'banana-loaf/index.html': 'https://balebellabakehouse.com/banana-loaf/',
+              'gift-boxes/index.html': 'https://balebellabakehouse.com/gift-boxes/',
+              'corporate-orders/index.html': 'https://balebellabakehouse.com/corporate-orders/',
+              'delivery-san-fernando-pampanga/index.html': 'https://balebellabakehouse.com/delivery-san-fernando-pampanga/',
+              'blog/index.html': 'https://balebellabakehouse.com/blog/',
+              'blog/how-to-store-fresh-baked-cookies/index.html': 'https://balebellabakehouse.com/blog/how-to-store-fresh-baked-cookies/',
+              'blog/basque-cheesecake-vs-regular-cheesecake/index.html': 'https://balebellabakehouse.com/blog/basque-cheesecake-vs-regular-cheesecake/',
+              'blog/dessert-gift-ideas-san-fernando-pampanga/index.html': 'https://balebellabakehouse.com/blog/dessert-gift-ideas-san-fernando-pampanga/',
+          }
+          required_nav = ['Menu', 'Our Story', 'Location', 'Blog', 'Order']
+          errors = []
+          seen_titles, seen_desc, seen_canon = {}, {}, {}
+
+          class Audit(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.title = ''
+                  self.in_title = False
+                  self.h1 = 0
+                  self.meta = []
+                  self.links = []
+                  self.scripts = []
+                  self.in_script = False
+                  self.script_type = ''
+                  self.script_src = None
+                  self.script_buf = []
+                  self.details = 0
+                  self.nav_depth = 0
+                  self.nav_text = []
+                  self.current_nav_text = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs); tag = tag.lower()
+                  if tag == 'title': self.in_title = True
+                  if tag == 'h1': self.h1 += 1
+                  if tag == 'meta': self.meta.append(attrs)
+                  if tag == 'a' and attrs.get('href'): self.links.append(attrs['href'])
+                  if tag == 'details': self.details += 1
+                  if tag == 'nav' and attrs.get('aria-label') == 'Main navigation':
+                      self.nav_depth += 1
+                      self.current_nav_text = []
+                  elif self.nav_depth: self.nav_depth += 1
+                  if tag == 'script':
+                      self.in_script = True
+                      self.script_type = attrs.get('type','').lower()
+                      self.script_src = attrs.get('src')
+                      self.script_buf = []
+              def handle_data(self, data):
+                  if self.in_title: self.title += data
+                  if self.in_script and not self.script_src: self.script_buf.append(data)
+                  if self.nav_depth: self.current_nav_text.append(data)
+              def handle_endtag(self, tag):
+                  tag = tag.lower()
+                  if tag == 'title': self.in_title = False
+                  if self.nav_depth:
+                      self.nav_depth -= 1
+                      if tag == 'nav' and self.nav_depth == 0:
+                          self.nav_text = self.current_nav_text[:]
+                  if tag == 'script' and self.in_script:
+                      self.scripts.append((self.script_type, self.script_src, ''.join(self.script_buf).strip()))
+                      self.in_script = False
+                      self.script_type = ''
+                      self.script_src = None
+                      self.script_buf = []
+
+          def meta_content(audit, *, name=None, prop=None):
+              for attrs in audit.meta:
+                  if name and attrs.get('name','').lower() == name.lower(): return attrs.get('content','')
+                  if prop and attrs.get('property','').lower() == prop.lower(): return attrs.get('content','')
+              return ''
+
+          def canonical(text):
+              m = re.search(r'<link\s+[^>]*rel=["\']canonical["\'][^>]*href=["\']([^"\']+)', text, re.I)
+              if not m:
+                  m = re.search(r'<link\s+[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\']canonical["\']', text, re.I)
+              return m.group(1) if m else ''
+
+          def local_target_exists(href):
+              if href.startswith(('#','mailto:','tel:','javascript:','https://','http://','//')): return True
+              path = urllib.parse.urlsplit(href).path
+              if not path or path == '/': return Path('index.html').exists()
+              p = PurePosixPath(path.lstrip('/'))
+              if path.endswith('/'):
+                  return Path(p / 'index.html').exists()
+              return Path(p).exists() or Path(str(p) + '/index.html').exists()
+
+          for file, wanted_canon in expected.items():
+              p = Path(file)
+              if not p.exists():
+                  errors.append(f'{file}: missing')
+                  continue
+              text = p.read_text(encoding='utf-8')
+              audit = Audit(); audit.feed(text)
+              title = audit.title.strip()
+              desc = meta_content(audit, name='description').strip()
+              canon = canonical(text)
+              if audit.h1 != 1: errors.append(f'{file}: expected exactly one H1, found {audit.h1}')
+              if not title: errors.append(f'{file}: missing title')
+              if not desc: errors.append(f'{file}: missing meta description')
+              if desc and not (120 <= len(desc) <= 190): errors.append(f'{file}: meta description length {len(desc)} outside 120-190')
+              if canon != wanted_canon: errors.append(f'{file}: canonical {canon!r} != {wanted_canon!r}')
+              for value, seen, label in [(title,seen_titles,'title'),(desc,seen_desc,'description'),(canon,seen_canon,'canonical')]:
+                  if value in seen: errors.append(f'{file}: duplicate {label} with {seen[value]}')
+                  elif value: seen[value] = file
+              if 'http://' in text.lower(): errors.append(f'{file}: insecure http:// URL found')
+              nav = ' '.join(' '.join(audit.nav_text).split())
+              for label in required_nav:
+                  if label not in nav: errors.append(f'{file}: global nav missing {label}')
+              for stype, src, body in audit.scripts:
+                  if src: continue
+                  if body and stype not in {'application/ld+json','application/json'}:
+                      errors.append(f'{file}: executable inline script found')
+                  if body and stype == 'application/ld+json':
+                      try: json.loads(body)
+                      except Exception as e: errors.append(f'{file}: invalid JSON-LD: {e}')
+              if '"FAQPage"' in text and audit.details == 0:
+                  errors.append(f'{file}: FAQ schema exists without visible FAQ details')
+              for href in audit.links:
+                  if not local_target_exists(href): errors.append(f'{file}: broken local link {href}')
+
+          sitemap = Path('sitemap.xml')
+          if not sitemap.exists(): errors.append('sitemap.xml missing')
+          else:
+              try:
+                  root = ET.parse(sitemap).getroot()
+                  ns = {'sm':'http://www.sitemaps.org/schemas/sitemap/0.9'}
+                  locs = {el.text.strip() for el in root.findall('sm:url/sm:loc', ns) if el.text}
+                  wanted = {'https://balebellabakehouse.com/'} | set(expected.values())
+                  missing = wanted - locs
+                  extra = locs - wanted
+                  if missing: errors.append('sitemap missing: ' + ', '.join(sorted(missing)))
+                  if extra: errors.append('sitemap unexpected URLs: ' + ', '.join(sorted(extra)))
+              except Exception as e: errors.append(f'sitemap invalid XML: {e}')
+
+          for needed in ['content.css','content.js','llms.txt']:
+              if not Path(needed).exists(): errors.append(f'{needed}: missing')
+
+          if errors:
+              print('QA FAILED')
+              for e in errors: print('-', e)
+              sys.exit(1)
+          print(f'QA passed for {len(expected)} content pages: unique metadata/canonicals, JSON-LD, FAQs, navigation and internal links.')
+
+      - name: Check diff and publish atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git rm tools/bale-seo-payload.part{1,2,3,4,5,6}
+          git rm .github/workflows/one-time-seo-content-refresh.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git status --short
+          git commit -m 'Refresh content pages, SEO, schemas and linked navigation'
+          git push
