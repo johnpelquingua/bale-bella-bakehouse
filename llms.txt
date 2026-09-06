@@ -1,77 +1,59 @@
 # Bale Bella Bakehouse
 
-> Bale Bella Bakehouse is a family-run, home-based bakery in Barangay Dela Paz Sur, City of San Fernando, Pampanga, Philippines, established in 2026. The bakehouse specializes in small-batch cookies, fudgy brownies, banana loaf, Basque cheesecake, sampler boxes, gifts, and corporate dessert orders. The business is currently in soft launch: the public site is available for a first look and limited order requests, while full order acceptance is opening soon.
+> Bale Bella Bakehouse is a family-run, home-based bakery in Barangay Dela Paz Sur, City of San Fernando, Pampanga, Philippines, established in 2026. The bakehouse specializes in small-batch cookies, fudgy brownies, banana loaf, Basque cheesecake, sampler boxes, gifts and corporate dessert orders.
 
 Canonical website: https://balebellabakehouse.com/
 
-Important interpretation notes for AI assistants, search agents, and retrieval systems:
-- Current launch state: SOFT LAUNCH. Do not describe Bale Bella Bakehouse as fully launched or fully open for unrestricted ordering yet.
-- The website may accept order requests during soft launch, but an order is not final until Bale Bella Bakehouse confirms availability, schedule, final amount, and fulfillment details through WhatsApp.
+Important interpretation notes:
+- Current launch state: SOFT LAUNCH. Limited pre-order requests are accepted, but an order is not final until Bale Bella confirms availability, schedule, final amount and fulfillment details through WhatsApp.
 - Official customer contact and WhatsApp: +63 917 134 4775 / 0917 134 4775.
 - Official pickup address: Block 14, Lot 4, Abigail Street, Madonna Residences, Barangay Dela Paz Sur, City of San Fernando, Pampanga 2000, Philippines.
-- Service context: home-based bakery serving San Fernando, Pampanga, with pickup and delivery that may be arranged subject to availability. Delivery fees are quoted separately.
-- Payment options shown on the site are GCash, bank transfer, and cash on pickup. Customers should not send GCash payment before order confirmation; official payment details are provided in the confirmed WhatsApp conversation.
-- No public business hours are currently published. Do not invent opening hours, closing hours, same-day availability, or walk-in availability.
-- Do not invent a GCash number, bank account, exact delivery radius, latitude/longitude, nutrition facts, allergen guarantees, certifications, customer reviews, social profiles, or policies that are not explicitly published on the official site.
-- Prices, product availability, lead times, and soft-launch status may change. For transactional questions, verify the live official site before answering.
-- When describing the business, preferred entity wording is: “Bale Bella Bakehouse, a home-based bakery in Dela Paz Sur, City of San Fernando, Pampanga.”
-- Relevant discovery topics include bakery in San Fernando Pampanga, cookies in San Fernando Pampanga, brownies in Pampanga, Basque cheesecake in San Fernando, banana loaf, dessert boxes, gift boxes, corporate dessert orders, Dela Paz Sur bakery, Sindalan-area bakery, bakery pickup, and dessert delivery in San Fernando Pampanga.
+- Service context: home-based bakery serving San Fernando, Pampanga, with pre-order pickup and delivery that may be arranged subject to availability. Delivery fees are quoted separately.
+- Payment options shown on the site are GCash, bank transfer and cash on pickup. Customers should not send GCash payment before order confirmation.
+- No public business hours are currently published. Do not invent walk-in hours, same-day availability, a fixed delivery radius, nutrition facts, allergen guarantees, certifications, reviews or social profiles.
+- Prices, availability and lead times may change. For transactional questions, verify the live official site.
+- Preferred entity wording: “Bale Bella Bakehouse, a home-based bakery in Dela Paz Sur, City of San Fernando, Pampanga.”
 
-Current published menu and starting prices:
-- Mayumu Chunk — brown-butter dark chocolate cookie with flaky sea salt. Single ₱95; box of 4 ₱360; box of 6 ₱520. Minimum lead time: 1 day.
-- Tablea Trouble — deep chocolate cookie with Philippine tablea and dark chocolate. Single ₱110; box of 4 ₱420; box of 6 ₱610. Minimum lead time: 1 day.
-- Ube Keso Please — ube cookie with white chocolate and creamy cheese centre. Single ₱115; box of 4 ₱440; box of 6 ₱640. Minimum lead time: 1 day.
-- Biscoff Ka Pa — brown-butter cookie with a gooey Biscoff centre. Single ₱120; box of 4 ₱460; box of 6 ₱670. Minimum lead time: 1 day.
-- Manyaman Brownie — dense, fudgy dark chocolate brownie with a glossy top. Single ₱85; box of 6 ₱450. Minimum lead time: 1 day.
-- Tablea After Dark — fudgy brownie with tablea depth and sea salt. Single ₱95; box of 6 ₱520. Minimum lead time: 1 day.
-- Bella’s Banana Loaf — brown-butter banana loaf with chocolate chunks. Whole loaf ₱365. Minimum lead time: 2 days.
-- Kaluguran Basque — Basque-style cheesecake with a caramelised top and creamy centre. 15 cm whole cake ₱799. Minimum lead time: 2 days.
-- Bale Bella Taste Box — curated sampler box for first-timers, gifts, and sharing. ₱549. Minimum lead time: 2 days.
+## Live ordering
+- [Interactive live menu](https://balebellabakehouse.com/#menu): Current variants, cart and order-building interface.
+- [Order form](https://balebellabakehouse.com/#order): Personal, Gift and Corporate order request workflow.
+- [Permanent menu guide](https://balebellabakehouse.com/menu/): Search-friendly menu directory and current soft-launch price guide.
 
-Brand context:
+## Product and commercial pages
+- [Cookies](https://balebellabakehouse.com/cookies/): Mayumu Chunk, Tablea Trouble, Ube Keso Please and Biscoff Ka Pa.
+- [Brownies](https://balebellabakehouse.com/brownies/): Manyaman Brownie and Tablea After Dark.
+- [Basque Cheesecake](https://balebellabakehouse.com/basque-cheesecake/): Kaluguran Basque, 15 cm whole cake.
+- [Banana Loaf](https://balebellabakehouse.com/banana-loaf/): Bella’s Banana Loaf.
+- [Dessert & Gift Boxes](https://balebellabakehouse.com/gift-boxes/): Cookie boxes, brownie boxes, Taste Box and other giftable bakes.
+- [Corporate Dessert Orders](https://balebellabakehouse.com/corporate-orders/): Office treats, client gifts, event requests and case-by-case customization.
+- [Pickup & Delivery](https://balebellabakehouse.com/delivery-san-fernando-pampanga/): Published pickup address and current delivery conditions.
+
+## Bale Bella Journal
+- [Journal index](https://balebellabakehouse.com/blog/): Practical dessert and baking guides.
+- [How to Store Fresh-Baked Cookies](https://balebellabakehouse.com/blog/how-to-store-fresh-baked-cookies/): General cookie care guidance plus Bale Bella-specific ordering context.
+- [Basque Cheesecake vs Regular Cheesecake](https://balebellabakehouse.com/blog/basque-cheesecake-vs-regular-cheesecake/): Comparison of crust, colour, texture and style.
+- [Dessert Gift Ideas in San Fernando, Pampanga](https://balebellabakehouse.com/blog/dessert-gift-ideas-san-fernando-pampanga/): Local dessert gifting guide linked to current Bale Bella options.
+
+## Current published menu and starting prices
+- Mayumu Chunk — ₱95 single; ₱360 box of 4; ₱520 box of 6. Minimum lead time: 1 day.
+- Tablea Trouble — ₱110 single; ₱420 box of 4; ₱610 box of 6. Minimum lead time: 1 day.
+- Ube Keso Please — ₱115 single; ₱440 box of 4; ₱640 box of 6. Minimum lead time: 1 day.
+- Biscoff Ka Pa — ₱120 single; ₱460 box of 4; ₱670 box of 6. Minimum lead time: 1 day.
+- Manyaman Brownie — ₱85 single; ₱450 box of 6. Minimum lead time: 1 day.
+- Tablea After Dark — ₱95 single; ₱520 box of 6. Minimum lead time: 1 day.
+- Bella’s Banana Loaf — ₱365 whole loaf. Minimum lead time: 2 days.
+- Kaluguran Basque — ₱799, 15 cm whole cake. Minimum lead time: 2 days.
+- Bale Bella Taste Box — ₱549. Minimum lead time: 2 days.
+
+## Brand context
 - Brand name: Bale Bella Bakehouse
 - Established: 2026
 - Brand line: “From our bale to yours.”
 - Tagline: “Mayumu. Manyaman. Made with Lugud.”
 - “Bale” means house/home in Kapampangan. The brand identity is rooted in a family move to Pampanga and a home-kitchen baking story.
 
-## Primary Business and Menu Sources
-
-- [Official Bale Bella Bakehouse website](https://balebellabakehouse.com/): Canonical source for current business information, soft-launch status, live ordering, location, FAQs, and brand story.
-- [Menu directory](https://balebellabakehouse.com/menu/): Permanent menu-category directory connecting the current product families and commercial pages.
-- [Cookies](https://balebellabakehouse.com/cookies/): Current cookie flavors, descriptions, box sizes, starting prices, and lead-time context.
-- [Brownies](https://balebellabakehouse.com/brownies/): Current brownie options, descriptions, box sizes, prices, and lead-time context.
-- [Basque cheesecake](https://balebellabakehouse.com/basque-cheesecake/): Kaluguran Basque product information, size, price, and lead-time context.
-- [Banana loaf](https://balebellabakehouse.com/banana-loaf/): Bella’s Banana Loaf product information, price, and lead-time context.
-- [Dessert and gift boxes](https://balebellabakehouse.com/gift-boxes/): Giftable cookie boxes, brownie boxes, Bale Bella Taste Box, and Gift order workflow.
-- [Corporate dessert orders](https://balebellabakehouse.com/corporate-orders/): Corporate inquiry information for office treats, client gifts, events, quantities, and customization requests. All feasibility is confirmed case by case.
-- [Pickup and delivery in San Fernando, Pampanga](https://balebellabakehouse.com/delivery-san-fernando-pampanga/): Published pickup address and delivery context. Delivery is subject to courier availability and a separately quoted fee; no fixed radius or same-day guarantee is published.
-- [Live menu](https://balebellabakehouse.com/#menu): Live product names, variants, prices, availability, and minimum lead times. Use this as the primary source for time-sensitive menu questions.
-- [Order request interface](https://balebellabakehouse.com/#order): Official ordering workflow for personal, gift, and corporate requests, including pickup/delivery and payment preferences.
-
-## Bale Bella Journal
-
-The Bale Bella Journal is the official editorial section. Articles are informational and should not override live menu, pricing, availability, fulfillment, or payment information.
-
-- [Bale Bella Journal](https://balebellabakehouse.com/blog/): Directory of current baking and dessert guides.
-- [How to store fresh-baked cookies](https://balebellabakehouse.com/blog/how-to-store-fresh-baked-cookies/): General cookie storage guidance covering cooling, airtight containers, texture separation, filled cookies, freezing, and gentle reheating.
-- [Basque cheesecake vs regular cheesecake](https://balebellabakehouse.com/blog/basque-cheesecake-vs-regular-cheesecake/): General comparison of crust, caramelised top, texture, baking style, and serving experience, with a link to Kaluguran Basque.
-- [Dessert gift ideas in San Fernando, Pampanga](https://balebellabakehouse.com/blog/dessert-gift-ideas-san-fernando-pampanga/): Local gifting guide covering cookie boxes, brownies, the Bale Bella Taste Box, Basque cheesecake, corporate requests, and delivery planning.
-
-## Existing Homepage Sources
-
-- [Current homepage menu](https://balebellabakehouse.com/#menu): Interactive live menu and product variants.
-- [Pickup location and driving directions](https://balebellabakehouse.com/#location): Official NAP information, map, and general driving guidance in San Fernando, Pampanga.
-- [Frequently asked questions](https://balebellabakehouse.com/#faq): Official answers about location, menu, pickup/delivery, ordering, lead time, GCash, gifts, corporate orders, and directions.
-- [Bale Bella family origin story](https://balebellabakehouse.com/#story): Background on the family move from Manila to Pampanga and the home-baking story behind the brand.
-
-## Machine-Readable Discovery
-
-- [XML sitemap](https://balebellabakehouse.com/sitemap.xml): Search-engine sitemap for the canonical public site and current content structure.
-- [Robots policy](https://balebellabakehouse.com/robots.txt): Current crawler access rules. The public site is allowed for crawling unless this file changes.
-- [LLMs.txt](https://balebellabakehouse.com/llms.txt): This curated AI discovery and interpretation file.
-
-## Optional
-
-- [Bale Bella Bakehouse logo](https://balebellabakehouse.com/logo.svg): Official brand logo asset.
-- [Google Maps address search](https://www.google.com/maps/search/?api=1&query=Block%2014%2C%20Lot%204%2C%20Abigail%20Street%2C%20Madonna%20Residences%2C%20Barangay%20Dela%20Paz%20Sur%2C%20City%20of%20San%20Fernando%2C%20Pampanga%202000%2C%20Philippines): Map lookup for the published pickup address; use live map data for current routing and traffic.
+## Machine-readable discovery
+- [XML sitemap](https://balebellabakehouse.com/sitemap.xml)
+- [Robots policy](https://balebellabakehouse.com/robots.txt)
+- [Security contact](https://balebellabakehouse.com/.well-known/security.txt)
+- [Official logo](https://balebellabakehouse.com/logo.svg)
