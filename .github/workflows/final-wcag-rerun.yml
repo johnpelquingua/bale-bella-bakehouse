@@ -1,0 +1,170 @@
+name: Final WCAG and Functional QA Rerun
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/final-wcag-rerun.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install browser QA tools
+        run: |
+          mkdir -p /tmp/bb-rerun && cd /tmp/bb-rerun
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+      - name: Verify functionality and WCAG 2.2 AA
+        env:
+          NODE_PATH: /tmp/bb-rerun/node_modules
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/bb-server.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          sleep 1
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const AxeBuilder = require('@axe-core/playwright').default;
+          const BASE='http://127.0.0.1:4173/';
+          const failures=[];
+          function check(ok,msg){console.log(`${ok?'PASS':'FAIL'}: ${msg}`);if(!ok)failures.push(msg)}
+          async function axe(page,label,selector=null){
+            let b=new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']);
+            if(selector)b=b.include(selector);
+            const r=await b.analyze();
+            check(r.violations.length===0,`${label}: axe WCAG 2.2 AA/best-practice`);
+            for(const v of r.violations){
+              console.log(`  [${v.impact}] ${v.id}: ${v.help}`);
+              for(const n of v.nodes)console.log(`    ${n.target.join(' ')} :: ${String(n.failureSummary||'').replace(/\n/g,' ')}`);
+            }
+          }
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              for(const vp of [{n:'desktop',w:1440,h:1000},{n:'mobile',w:390,h:844},{n:'narrow-320',w:320,h:900}]){
+                console.log(`\n=== ${vp.n} ===`);
+                const ctx=await browser.newContext({viewport:{width:vp.w,height:vp.h}});
+                const page=await ctx.newPage();
+                const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+                await page.addInitScript(()=>{
+                  window.__openedUrl='';
+                  window.open=url=>{window.__openedUrl=String(url||'');return{opener:null}};
+                  window.confirm=()=>true;
+                });
+                await page.goto(BASE,{waitUntil:'domcontentloaded'});
+                await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});
+                await page.reload({waitUntil:'domcontentloaded'});
+                await page.waitForSelector('#menuGrid .card');
+
+                check(errors.length===0,`${vp.n}: no JavaScript errors`);
+                check(await page.locator('h1').count()===1,`${vp.n}: one H1`);
+                check(await page.locator('main').count()===1,`${vp.n}: main landmark present`);
+                check(await page.locator('img:not([alt])').count()===0,`${vp.n}: images have alt text`);
+                check(await page.locator('iframe:not([title])').count()===0,`${vp.n}: iframe titled`);
+
+                await page.locator('body').focus(); await page.keyboard.press('Tab');
+                check(String(await page.evaluate(()=>document.activeElement?.className||'')).includes('skip-link'),`${vp.n}: skip link is first keyboard focus`);
+                await page.locator('.skip-link').press('Enter');
+                check(await page.evaluate(()=>location.hash)==='#top',`${vp.n}: skip link reaches main`);
+
+                check(await page.locator('#menuGrid .card').count()===9,`${vp.n}: 9 menu products render`);
+                await page.getByRole('button',{name:'Cookies',exact:true}).click();
+                check(await page.locator('#menuGrid .card').count()===4,`${vp.n}: category filter works`);
+                check((await page.locator('#menuStatus').textContent()).includes('4'),`${vp.n}: filter result is announced`);
+                await page.getByRole('button',{name:'All',exact:true}).click();
+
+                const select=page.locator('[data-variant-select="mayumu"]');
+                await select.selectOption('1');
+                check((await page.locator('#price-mayumu').textContent()).trim()==='₱360',`${vp.n}: variant price changes correctly`);
+                await select.selectOption('0');
+                await page.locator('[data-add="mayumu"]').click();
+                check((await page.locator('#cartCount').textContent()).trim()==='1',`${vp.n}: add to cart works`);
+                check((await page.locator('#subtotal').textContent()).trim()==='₱95',`${vp.n}: subtotal correct`);
+                check(await page.locator('.burst[aria-hidden="true"]').count()>0,`${vp.n}: decorative cart particles hidden from assistive tech`);
+                check(Boolean(await page.evaluate(()=>localStorage.getItem('bb_cart'))),`${vp.n}: cart persistence stored`);
+                await page.reload({waitUntil:'domcontentloaded'}); await page.waitForSelector('#menuGrid .card');
+                check((await page.locator('#cartCount').textContent()).trim()==='1',`${vp.n}: cart restores after reload`);
+                await page.locator('#cartList [data-delta="1"]').first().click();
+                check((await page.locator('#subtotal').textContent()).trim()==='₱190',`${vp.n}: increment recalculates`);
+                await page.locator('#cartList [data-delta="-1"]').first().click();
+                check((await page.locator('#subtotal').textContent()).trim()==='₱95',`${vp.n}: decrement recalculates`);
+                await axe(page,`${vp.n}/cart-state`);
+
+                await page.locator('[data-add="banana"]').click();
+                check((await page.locator('#leadHint').textContent()).includes('2 days'),`${vp.n}: lead time follows longest-lead item`);
+                await page.locator('#cartList [data-cart-key^="banana::"][data-delta="-1"]').first().click();
+
+                await page.locator('[data-mode="delivery"]').click();
+                await page.locator('[data-order-type="gift"]').click();
+                check(await page.locator('#address').evaluate(el=>el.required),`${vp.n}: delivery address required`);
+                check(await page.locator('#recipientName').evaluate(el=>el.required),`${vp.n}: gift recipient required`);
+                check(await page.locator('#address').getAttribute('aria-required')==='true',`${vp.n}: dynamic required state exposed`);
+                await axe(page,`${vp.n}/delivery-gift-state`);
+
+                await page.locator('[data-order-type="corporate"]').click();
+                await page.locator('#customerName').fill('QA Tester');
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#address').fill('QA Address, San Fernando');
+                await page.locator('#companyName').fill('QA Company');
+                await page.locator('#guestCount').fill('9');
+                await page.locator('#sendBtn').click();
+                check(await page.locator('#guestCount').getAttribute('aria-invalid')==='true',`${vp.n}: corporate minimum quantity validates`);
+
+                await page.locator('[data-order-type="personal"]').click();
+                await page.locator('[data-mode="pickup"]').click();
+                await page.locator('#customerPhone').fill('123');
+                await page.locator('#sendBtn').click();
+                check(await page.locator('#customerPhone').getAttribute('aria-invalid')==='true',`${vp.n}: invalid phone marked accessibly`);
+                check(await page.locator('#customerPhone').evaluate(el=>el===document.activeElement),`${vp.n}: first invalid field receives focus`);
+                await page.locator('#customerPhone').fill('09171344775');
+                await page.locator('#sendBtn').click();
+                const orderUrl=await page.evaluate(()=>window.__openedUrl);
+                check(orderUrl.startsWith('https://wa.me/639171344775?text='),`${vp.n}: WhatsApp order URL generated`);
+                const decoded=decodeURIComponent(orderUrl);
+                check(decoded.includes('Mayumu Chunk')&&decoded.includes('QA Tester'),`${vp.n}: WhatsApp payload complete`);
+
+                await page.locator('[data-payment="Bank transfer"]').click();
+                check(await page.locator('#gcashCard').evaluate(el=>el.hidden),`${vp.n}: payment state switches correctly`);
+                await page.locator('[data-payment="GCash"]').click();
+
+                await page.locator('#shareBtn').click();
+                check(await page.locator('#shareDialog').evaluate(el=>el.open),`${vp.n}: share dialog opens`);
+                check(await page.locator('#shareDialog').evaluate(el=>el.contains(document.activeElement)),`${vp.n}: modal focus enters dialog`);
+                await axe(page,`${vp.n}/share-dialog`,'#shareDialog');
+                await page.keyboard.press('Escape');
+                check(!(await page.locator('#shareDialog').evaluate(el=>el.open)),`${vp.n}: Escape closes dialog`);
+
+                const noClip=await page.evaluate(()=>[...document.querySelectorAll('main a,main button,main input,main select,main textarea,main article,main h1,main h2,main h3')].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').every(el=>{const r=el.getBoundingClientRect();return r.width<=innerWidth+1&&r.right<=innerWidth+1&&r.left>=-1}));
+                check(noClip,`${vp.n}: no primary horizontal clipping`);
+                await ctx.close();
+              }
+
+              const rc=await browser.newContext({viewport:{width:1280,height:800},reducedMotion:'reduce'});const rp=await rc.newPage();
+              await rp.goto(BASE,{waitUntil:'domcontentloaded'});await rp.evaluate(()=>localStorage.removeItem('bb_motion'));await rp.reload({waitUntil:'domcontentloaded'});
+              check(await rp.locator('body').evaluate(el=>el.classList.contains('motion-off')),'reduced-motion preference defaults motion off');
+              check(await rp.locator('#motionBtn').getAttribute('aria-pressed')==='false','motion control exposes off state');
+              check(await rp.evaluate(()=>getComputedStyle(document.documentElement).scrollBehavior)==='auto','reduced motion disables smooth scrolling');
+              await rc.close();
+
+              const nc=await browser.newContext({viewport:{width:1280,height:800},javaScriptEnabled:false});const np=await nc.newPage();
+              await np.goto(BASE,{waitUntil:'domcontentloaded'});
+              check(await np.locator('#story .reveal').first().evaluate(el=>getComputedStyle(el).opacity)==='1','meaningful content visible without JavaScript');
+              check((await np.locator('noscript').textContent()).includes('0917 134 4775'),'no-JS ordering fallback available');
+              await nc.close();
+            } finally {await browser.close()}
+            console.log(`\nFINAL FAILURES: ${failures.length}`);
+            failures.forEach(f=>console.log(`- ${f}`));
+            if(failures.length)process.exit(1);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
