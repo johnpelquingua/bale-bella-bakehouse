@@ -109,12 +109,19 @@ for p in HTMLS:
     else:
         try:
             data=json.loads(m.group(1))
-            raw=json.dumps(data,ensure_ascii=False)
-            expected='"sameAs": ' + json.dumps(SOCIALS,ensure_ascii=False)
-            if expected not in raw:
-                # compact comparison independent of spaces
-                if '"sameAs":' + json.dumps(SOCIALS,ensure_ascii=False,separators=(",",":")) not in raw.replace(" ",""):
-                    errors.append(f"{p}: sameAs does not contain full official social set")
+            found=[]
+            def walk(obj):
+                if isinstance(obj, dict):
+                    if isinstance(obj.get("sameAs"), list):
+                        found.append(obj["sameAs"])
+                    for value in obj.values():
+                        walk(value)
+                elif isinstance(obj, list):
+                    for value in obj:
+                        walk(value)
+            walk(data)
+            if SOCIALS not in found:
+                errors.append(f"{p}: sameAs does not contain full official social set in required order")
         except Exception as exc:
             errors.append(f"{p}: invalid JSON-LD: {exc}")
 
