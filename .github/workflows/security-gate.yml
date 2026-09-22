@@ -305,6 +305,47 @@ jobs:
               print('SEO/PAGE-FREEZE QA FAILED');print('\n'.join('- '+e for e in errors));sys.exit(1)
           print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages. No new pages permitted without deliberate gate change.')
 
+      - name: Enforce official social ordering channels
+        shell: python
+        run: |
+          from pathlib import Path
+          import sys
+
+          messenger = 'https://m.me/balebellabakehouse'
+          facebook = 'https://www.facebook.com/balebellabakehouse'
+          instagram = 'https://www.instagram.com/balebellabakehouse/'
+          errors = []
+          customer_files = [p for p in Path('.').rglob('index.html') if '.git' not in p.parts]
+          customer_files += [Path('site.js'), Path('llms.txt'), Path('SECURITY.md'), Path('.well-known/security.txt')]
+
+          for p in customer_files:
+              text = p.read_text(encoding='utf-8', errors='ignore')
+              if 'WhatsApp' in text or 'wa.me' in text or 'whatsappNumber' in text or 'float-whatsapp' in text:
+                  errors.append(f'{p}: legacy WhatsApp ordering reference remains')
+
+          for p in [p for p in Path('.').rglob('index.html') if '.git' not in p.parts]:
+              text = p.read_text(encoding='utf-8', errors='ignore')
+              for label, url in [('Messenger', messenger), ('Facebook', facebook), ('Instagram', instagram)]:
+                  if url not in text:
+                      errors.append(f'{p}: missing official {label} URL')
+              if 'sameAs' not in text:
+                  errors.append(f'{p}: missing social sameAs structured data')
+
+          js = Path('site.js').read_text(encoding='utf-8')
+          if messenger not in js or instagram not in js:
+              errors.append('site.js: ordering actions are not wired to Messenger and Instagram')
+
+          llms = Path('llms.txt').read_text(encoding='utf-8')
+          for url in (messenger, facebook, instagram):
+              if url not in llms:
+                  errors.append(f'llms.txt: missing official social URL {url}')
+
+          if errors:
+              print('SOCIAL ORDERING QA FAILED')
+              print('\n'.join('- ' + e for e in errors))
+              sys.exit(1)
+          print('Official social-ordering QA passed: Messenger primary, Instagram secondary, legacy WhatsApp references removed.')
+
       - name: Verify required production files
         shell: bash
         run: |
