@@ -30,6 +30,9 @@ jobs:
           node --check site.js
           node --check content.js
           git diff --check
+          # The GitHub Actions token cannot modify another workflow file.
+          # Revert the permanent gate here; it will be updated separately through the GitHub connector.
+          git checkout -- .github/workflows/security-gate.yml
 
       - name: Publish migration and remove temporary tooling
         shell: bash
