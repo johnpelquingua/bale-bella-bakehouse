@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/one-time-social-presence.yml'
+      - '.github/workflows/one-time-social-presence.yml' # retry
   workflow_dispatch:
 
 permissions:
