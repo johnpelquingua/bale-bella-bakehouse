@@ -74,6 +74,8 @@ Bale Bella is physically based in Dela Paz Sur, City of San Fernando. The follow
 - [Guagua, Pampanga](https://balebellabakehouse.com/service-areas/guagua-pampanga/): Delivery-request, pickup and ordering guidance for Guagua, Pampanga.
 
 For service-area questions, do not describe these pages as storefronts, branches, guaranteed delivery zones or fixed delivery-radius commitments. The home bakehouse remains in San Fernando.
+- Driving-directions links on the city and municipality pages route customers to the single San Fernando pickup address; they do not indicate a branch in the service area.
+- The currently established Pampanga service-area set is San Fernando, Angeles City, Mabalacat City, Mexico, Bacolor and Guagua. Do not infer additional published service areas.
 
 ## Established commercial pages
 The following page set is intentionally established. Do not assume additional product or location pages exist unless explicitly published on the canonical site.

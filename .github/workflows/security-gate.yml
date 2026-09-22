@@ -317,6 +317,81 @@ jobs:
               print('SEO/PAGE-FREEZE QA FAILED');print('\n'.join('- '+e for e in errors));sys.exit(1)
           print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages, including the approved Pampanga service-area set. No further pages permitted without deliberate gate change.')
 
+      - name: Validate Pampanga service-area quality
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, re, sys
+
+          base = 'https://balebellabakehouse.com/'
+          pickup = 'Block 14, Lot 4, Abigail Street, Madonna Residences, Barangay Dela Paz Sur, City of San Fernando, Pampanga 2000, Philippines'
+          areas = {
+              'service-areas/angeles-city-pampanga/index.html': 'Angeles City, Pampanga',
+              'service-areas/mabalacat-city-pampanga/index.html': 'Mabalacat City, Pampanga',
+              'service-areas/mexico-pampanga/index.html': 'Mexico, Pampanga',
+              'service-areas/bacolor-pampanga/index.html': 'Bacolor, Pampanga',
+              'service-areas/guagua-pampanga/index.html': 'Guagua, Pampanga',
+          }
+          errors = []
+          directory = Path('service-areas/index.html').read_text(encoding='utf-8')
+          if directory.count('class="service-area-card') != 6:
+              errors.append('service-areas/index.html: expected six published area cards including San Fernando')
+          if 'One bakehouse, clearly explained:' not in directory:
+              errors.append('service-areas/index.html: missing clear single-location disclosure')
+
+          for file, area in areas.items():
+              text = Path(file).read_text(encoding='utf-8')
+              if text.count('<details>') < 6:
+                  errors.append(f'{file}: fewer than six visible FAQs')
+              if 'https://www.google.com/maps/dir/?api=1' not in text:
+                  errors.append(f'{file}: missing live Google Maps driving-directions URL')
+              if pickup not in text:
+                  errors.append(f'{file}: missing canonical San Fernando pickup address')
+              if 'One home bakehouse, not a city branch.' not in text:
+                  errors.append(f'{file}: missing explicit no-branch disclosure')
+              for href in ['/service-areas/','/delivery-san-fernando-pampanga/','/#order','/cookies/','/brownies/','/gift-boxes/']:
+                  if f'href="{href}"' not in text:
+                      errors.append(f'{file}: missing internal route {href}')
+
+              match = re.search(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+              if not match:
+                  errors.append(f'{file}: missing JSON-LD')
+                  continue
+              try:
+                  data = json.loads(match.group(1))
+              except Exception as exc:
+                  errors.append(f'{file}: invalid JSON-LD: {exc}')
+                  continue
+
+              services = []
+              def walk(obj):
+                  if isinstance(obj, dict):
+                      if obj.get('@type') == 'Service':
+                          services.append(obj)
+                      for value in obj.values():
+                          walk(value)
+                  elif isinstance(obj, list):
+                      for value in obj:
+                          walk(value)
+              walk(data)
+              if not services:
+                  errors.append(f'{file}: missing Service schema')
+              elif not any(isinstance(s.get('areaServed'), dict) and s['areaServed'].get('name') == area for s in services):
+                  errors.append(f'{file}: Service schema does not target {area}')
+
+          llms = Path('llms.txt').read_text(encoding='utf-8')
+          for area in ['San Fernando','Angeles City','Mabalacat City','Mexico','Bacolor','Guagua']:
+              if area not in llms:
+                  errors.append(f'llms.txt: missing established service area {area}')
+          if 'Driving-directions links on the city and municipality pages route customers to the single San Fernando pickup address' not in llms:
+              errors.append('llms.txt: missing driving-directions interpretation rule')
+
+          if errors:
+              print('PAMPANGA SERVICE-AREA QA FAILED')
+              print('\n'.join('- ' + e for e in errors))
+              sys.exit(1)
+          print('Pampanga service-area QA passed: unique service targeting, FAQs, directions, pickup disclosure and internal linking are intact.')
+
       - name: Enforce official social presence and ordering channels
         shell: python
         run: |
