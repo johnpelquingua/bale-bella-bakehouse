@@ -140,6 +140,12 @@ jobs:
             'gift-boxes/index.html':BASE+'gift-boxes/',
             'corporate-orders/index.html':BASE+'corporate-orders/',
             'delivery-san-fernando-pampanga/index.html':BASE+'delivery-san-fernando-pampanga/',
+            'service-areas/index.html':BASE+'service-areas/',
+            'service-areas/angeles-city-pampanga/index.html':BASE+'service-areas/angeles-city-pampanga/',
+            'service-areas/mabalacat-city-pampanga/index.html':BASE+'service-areas/mabalacat-city-pampanga/',
+            'service-areas/mexico-pampanga/index.html':BASE+'service-areas/mexico-pampanga/',
+            'service-areas/bacolor-pampanga/index.html':BASE+'service-areas/bacolor-pampanga/',
+            'service-areas/guagua-pampanga/index.html':BASE+'service-areas/guagua-pampanga/',
             'blog/index.html':BASE+'blog/',
             'blog/how-to-store-fresh-baked-cookies/index.html':BASE+'blog/how-to-store-fresh-baked-cookies/',
             'blog/basque-cheesecake-vs-regular-cheesecake/index.html':BASE+'blog/basque-cheesecake-vs-regular-cheesecake/',
@@ -155,13 +161,19 @@ jobs:
             'gift-boxes/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','ItemList','FAQPage'},
             'corporate-orders/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
             'delivery-san-fernando-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'service-areas/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','ItemList','Service','FAQPage'},
+            'service-areas/angeles-city-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'service-areas/mabalacat-city-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'service-areas/mexico-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'service-areas/bacolor-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
+            'service-areas/guagua-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Service','FAQPage'},
             'blog/index.html':{'Bakery','WebSite','BreadcrumbList','CollectionPage','WebPage','Blog','FAQPage'},
             'blog/how-to-store-fresh-baked-cookies/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
             'blog/basque-cheesecake-vs-regular-cheesecake/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
             'blog/dessert-gift-ideas-san-fernando-pampanga/index.html':{'Bakery','WebSite','BreadcrumbList','WebPage','Blog','BlogPosting','FAQPage'},
           }
           THEMES={
-            'menu/index.html':'theme-menu','cookies/index.html':'theme-cookies','brownies/index.html':'theme-brownies','basque-cheesecake/index.html':'theme-cheesecake','banana-loaf/index.html':'theme-banana','gift-boxes/index.html':'theme-gifts','corporate-orders/index.html':'theme-corporate','delivery-san-fernando-pampanga/index.html':'theme-delivery','blog/index.html':'theme-journal','blog/how-to-store-fresh-baked-cookies/index.html':'theme-cookies','blog/basque-cheesecake-vs-regular-cheesecake/index.html':'theme-cheesecake','blog/dessert-gift-ideas-san-fernando-pampanga/index.html':'theme-gifts'
+            'menu/index.html':'theme-menu','cookies/index.html':'theme-cookies','brownies/index.html':'theme-brownies','basque-cheesecake/index.html':'theme-cheesecake','banana-loaf/index.html':'theme-banana','gift-boxes/index.html':'theme-gifts','corporate-orders/index.html':'theme-corporate','delivery-san-fernando-pampanga/index.html':'theme-delivery','service-areas/index.html':'theme-service','service-areas/angeles-city-pampanga/index.html':'theme-service','service-areas/mabalacat-city-pampanga/index.html':'theme-service','service-areas/mexico-pampanga/index.html':'theme-service','service-areas/bacolor-pampanga/index.html':'theme-service','service-areas/guagua-pampanga/index.html':'theme-service','blog/index.html':'theme-journal','blog/how-to-store-fresh-baked-cookies/index.html':'theme-cookies','blog/basque-cheesecake-vs-regular-cheesecake/index.html':'theme-cheesecake','blog/dessert-gift-ideas-san-fernando-pampanga/index.html':'theme-gifts'
           }
           errors=[]
 
@@ -303,7 +315,7 @@ jobs:
               if 'johnpelquingua.github.io/bale-bella-bakehouse' in t or 'bale-bella-bakehouse.pages.dev' in t:errors.append(f'{p}: legacy production URL found')
           if errors:
               print('SEO/PAGE-FREEZE QA FAILED');print('\n'.join('- '+e for e in errors));sys.exit(1)
-          print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages. No new pages permitted without deliberate gate change.')
+          print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages, including the approved Pampanga service-area set. No further pages permitted without deliberate gate change.')
 
       - name: Enforce official social presence and ordering channels
         shell: python
