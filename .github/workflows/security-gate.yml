@@ -305,46 +305,87 @@ jobs:
               print('SEO/PAGE-FREEZE QA FAILED');print('\n'.join('- '+e for e in errors));sys.exit(1)
           print(f'SEO/page-freeze QA passed for {len(CONTENT)} established content pages. No new pages permitted without deliberate gate change.')
 
-      - name: Enforce official social ordering channels
+      - name: Enforce official social presence and ordering channels
         shell: python
         run: |
           from pathlib import Path
-          import sys
+          import json, re, sys
 
           messenger = 'https://m.me/balebellabakehouse'
-          facebook = 'https://www.facebook.com/balebellabakehouse'
-          instagram = 'https://www.instagram.com/balebellabakehouse/'
+          socials = [
+              ('Facebook', 'https://www.facebook.com/balebellabakehouse'),
+              ('Instagram', 'https://www.instagram.com/balebellabakehouse/'),
+              ('YouTube', 'https://www.youtube.com/@balebellabakehouse'),
+              ('Threads', 'https://www.threads.com/@balebellabakehouse'),
+              ('Pinterest', 'https://www.pinterest.com/balebellabakehouse/'),
+          ]
           errors = []
-          customer_files = [p for p in Path('.').rglob('index.html') if '.git' not in p.parts]
-          customer_files += [Path('site.js'), Path('llms.txt'), Path('SECURITY.md'), Path('.well-known/security.txt')]
+          html_pages = [p for p in Path('.').rglob('index.html') if '.git' not in p.parts]
+          customer_files = html_pages + [Path('site.js'), Path('llms.txt'), Path('SECURITY.md'), Path('.well-known/security.txt')]
 
           for p in customer_files:
               text = p.read_text(encoding='utf-8', errors='ignore')
               if 'WhatsApp' in text or 'wa.me' in text or 'whatsappNumber' in text or 'float-whatsapp' in text:
                   errors.append(f'{p}: legacy WhatsApp ordering reference remains')
 
-          for p in [p for p in Path('.').rglob('index.html') if '.git' not in p.parts]:
+          social_urls = [url for _, url in socials]
+          for p in html_pages:
               text = p.read_text(encoding='utf-8', errors='ignore')
-              for label, url in [('Messenger', messenger), ('Facebook', facebook), ('Instagram', instagram)]:
+              if messenger not in text:
+                  errors.append(f'{p}: missing official Messenger URL')
+              for label, url in socials:
                   if url not in text:
                       errors.append(f'{p}: missing official {label} URL')
-              if 'sameAs' not in text:
-                  errors.append(f'{p}: missing social sameAs structured data')
+                  if f'rel="me" href="{url}"' not in text:
+                      errors.append(f'{p}: missing rel=me discovery link for {label}')
+              if text.count('class="social-hub"') != 1:
+                  errors.append(f'{p}: expected exactly one social follow section')
+
+              hub_at = text.find('class="social-hub-links"')
+              hub = text[hub_at:hub_at+7000] if hub_at >= 0 else ''
+              positions = [hub.find(url) for url in social_urls]
+              if any(pos < 0 for pos in positions) or positions != sorted(positions):
+                  errors.append(f'{p}: social links must appear in Facebook, Instagram, YouTube, Threads, Pinterest order')
+
+              match = re.search(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+              if not match:
+                  errors.append(f'{p}: missing JSON-LD for social entity verification')
+              else:
+                  try:
+                      data = json.loads(match.group(1))
+                      found = []
+                      def walk(obj):
+                          if isinstance(obj, dict):
+                              if isinstance(obj.get('sameAs'), list):
+                                  found.append(obj['sameAs'])
+                              for value in obj.values():
+                                  walk(value)
+                          elif isinstance(obj, list):
+                              for value in obj:
+                                  walk(value)
+                      walk(data)
+                      if social_urls not in found:
+                          errors.append(f'{p}: Bakery entity sameAs does not contain the five official profiles in required order')
+                  except Exception as exc:
+                      errors.append(f'{p}: social JSON-LD validation failed: {exc}')
 
           js = Path('site.js').read_text(encoding='utf-8')
+          instagram = dict(socials)['Instagram']
           if messenger not in js or instagram not in js:
               errors.append('site.js: ordering actions are not wired to Messenger and Instagram')
 
           llms = Path('llms.txt').read_text(encoding='utf-8')
-          for url in (messenger, facebook, instagram):
+          for url in [messenger] + social_urls:
               if url not in llms:
                   errors.append(f'llms.txt: missing official social URL {url}')
+          if 'Facebook, Instagram, YouTube, Threads, Pinterest' not in llms:
+              errors.append('llms.txt: missing canonical social presentation order')
 
           if errors:
-              print('SOCIAL ORDERING QA FAILED')
+              print('SOCIAL PRESENCE / ORDERING QA FAILED')
               print('\n'.join('- ' + e for e in errors))
               sys.exit(1)
-          print('Official social-ordering QA passed: Messenger primary, Instagram secondary, legacy WhatsApp references removed.')
+          print('Social presence QA passed: five official profiles are linked in canonical order; Messenger remains primary for orders.')
 
       - name: Verify required production files
         shell: bash
