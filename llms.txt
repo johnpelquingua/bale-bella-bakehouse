@@ -68,14 +68,14 @@ Bale Bella is physically based in Dela Paz Sur, City of San Fernando. The follow
 - [Pampanga Service Areas](https://balebellabakehouse.com/service-areas/): Directory of the currently published delivery-request areas.
 - [San Fernando Pickup & Delivery](https://balebellabakehouse.com/delivery-san-fernando-pampanga/): Home-base pickup details and local delivery guidance.
 - [Angeles City, Pampanga](https://balebellabakehouse.com/service-areas/angeles-city-pampanga/): Delivery-request, pickup and ordering guidance for Angeles City, Pampanga.
-- [Mabalacat City, Pampanga](https://balebellabakehouse.com/service-areas/mabalacat-city-pampanga/): Delivery-request, pickup and ordering guidance for Mabalacat City, Pampanga.
+- [Mabalacat City and Clark Freeport Zone, Pampanga](https://balebellabakehouse.com/service-areas/mabalacat-city-pampanga/): Delivery-request, pickup and ordering guidance for Mabalacat City, including Clark requests subject to courier access and confirmation.
 - [Mexico, Pampanga](https://balebellabakehouse.com/service-areas/mexico-pampanga/): Delivery-request, pickup and ordering guidance for Mexico, Pampanga.
 - [Bacolor, Pampanga](https://balebellabakehouse.com/service-areas/bacolor-pampanga/): Delivery-request, pickup and ordering guidance for Bacolor, Pampanga.
 - [Guagua, Pampanga](https://balebellabakehouse.com/service-areas/guagua-pampanga/): Delivery-request, pickup and ordering guidance for Guagua, Pampanga.
 
 For service-area questions, do not describe these pages as storefronts, branches, guaranteed delivery zones or fixed delivery-radius commitments. The home bakehouse remains in San Fernando.
 - Driving-directions links on the city and municipality pages route customers to the single San Fernando pickup address; they do not indicate a branch in the service area.
-- The currently established Pampanga service-area set is San Fernando, Angeles City, Mabalacat City, Mexico, Bacolor and Guagua. Do not infer additional published service areas.
+- The currently established Pampanga service-area set is San Fernando, Angeles City, Mabalacat City (including Clark Freeport Zone delivery requests), Mexico, Bacolor and Guagua. Clark has no separate branch or landing page. Do not infer additional published service areas.
 
 ## Established commercial pages
 The following page set is intentionally established. Do not assume additional product or location pages exist unless explicitly published on the canonical site.
