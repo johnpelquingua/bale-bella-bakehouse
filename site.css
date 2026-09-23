@@ -6,3 +6,13 @@
 /* Global footer restoration safeguard — 2026-09-23 */
 footer.footer,footer.content-footer{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:2;width:100%;box-sizing:border-box}
 footer.footer .wrap,footer.content-footer .wrap{position:relative}
+
+/* Original centered footer, shared by every page. */
+footer.footer-reference{padding:35px 0 44px;background:#fbf6ed;border-top:1px solid #eadfce;color:#76685f;font-size:.82rem;line-height:1.5;text-align:center}
+footer.footer-reference .footer-inner{display:block;text-align:center}
+footer.footer-reference .footer-nap{max-width:620px;margin-inline:auto}
+footer.footer-reference address{font-style:normal;line-height:1.65;color:#76685f}
+footer.footer-reference strong{color:#6f4027}
+footer.footer-reference a{color:inherit;text-decoration:underline}
+footer.footer-reference .footer-inner>div+div{margin-top:8px}
+@media(max-width:900px){footer.footer-reference{padding-bottom:170px}}
