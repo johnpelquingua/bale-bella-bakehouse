@@ -16,3 +16,6 @@ footer.footer-reference strong{color:#6f4027}
 footer.footer-reference a{color:inherit;text-decoration:underline}
 footer.footer-reference .footer-inner>div+div{margin-top:8px}
 @media(max-width:900px){footer.footer-reference{padding-bottom:170px}}
+
+/* Keep unavailable order actions visibly consistent. */
+.copy-btn:disabled,.payment-option:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
