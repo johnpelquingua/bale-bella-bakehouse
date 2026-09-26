@@ -114,11 +114,7 @@ jobs:
                   csp=a.csp.lower()
                   for d in ["default-src 'self'","script-src 'self'","object-src 'none'","base-uri 'self'","form-action 'self'",'upgrade-insecure-requests']:
                       if d not in csp: errors.append(f'{p}: CSP missing {d}')
-              allowed_inline_js = {"""window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-GZWY3EYCE1');"""}
+              allowed_inline_js = {"window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n\n  gtag('config', 'G-GZWY3EYCE1');"}
               for inline in a.inline:
                   if inline not in allowed_inline_js:
                       errors.append(f'{p}: executable inline JavaScript found')
