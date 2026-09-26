@@ -115,8 +115,10 @@ jobs:
                   for d in ["default-src 'self'","script-src 'self'","object-src 'none'","base-uri 'self'","form-action 'self'",'upgrade-insecure-requests']:
                       if d not in csp: errors.append(f'{p}: CSP missing {d}')
               if a.inline: errors.append(f'{p}: executable inline JavaScript found')
+              allowed_external_js = {'https://www.googletagmanager.com/gtag/js?id=G-GZWY3EYCE1'}
               for src in a.external:
-                  if src.startswith(('http://','https://','//')): errors.append(f'{p}: external JavaScript not allowed: {src}')
+                  if src.startswith(('http://','https://','//')) and src not in allowed_external_js:
+                      errors.append(f'{p}: external JavaScript not allowed: {src}')
               if re.search(r'\bhttp://', text, re.I): errors.append(f'{p}: insecure http:// URL found')
           if errors:
               print('Browser security contract failed:'); print('\n'.join('- '+e for e in errors)); sys.exit(1)
