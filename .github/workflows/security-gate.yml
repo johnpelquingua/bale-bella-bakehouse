@@ -103,7 +103,7 @@ jobs:
               def handle_endtag(self, tag):
                   if tag.lower()=='script' and self.in_script:
                       body=''.join(self.buf).strip()
-                      if body and self.script_type not in {'application/ld+json','application/json'}: self.inline.append(body[:80])
+                      if body and self.script_type not in {'application/ld+json','application/json'}: self.inline.append(body)
                       self.in_script=False; self.script_type=''; self.script_src=None; self.buf=[]
 
           for p in Path('.').rglob('index.html'):
@@ -114,7 +114,14 @@ jobs:
                   csp=a.csp.lower()
                   for d in ["default-src 'self'","script-src 'self'","object-src 'none'","base-uri 'self'","form-action 'self'",'upgrade-insecure-requests']:
                       if d not in csp: errors.append(f'{p}: CSP missing {d}')
-              if a.inline: errors.append(f'{p}: executable inline JavaScript found')
+              allowed_inline_js = {"""window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-GZWY3EYCE1');"""}
+              for inline in a.inline:
+                  if inline not in allowed_inline_js:
+                      errors.append(f'{p}: executable inline JavaScript found')
               allowed_external_js = {'https://www.googletagmanager.com/gtag/js?id=G-GZWY3EYCE1'}
               for src in a.external:
                   if src.startswith(('http://','https://','//')) and src not in allowed_external_js:
