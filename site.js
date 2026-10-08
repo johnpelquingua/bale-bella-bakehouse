@@ -57,6 +57,8 @@ function updateRaisinGallery(index){
   const image=$(id);
   if(!image)continue;
   image.parentElement.classList.remove("is-loaded");
+  const fallback=image.parentElement.querySelector(".raisin-photo-placeholder small");
+  if(fallback)fallback.textContent=raisinGalleryIndex===0?"Single-cookie photo coming soon":"Photo temporarily unavailable";
   image.alt=item.alt;
   if(image.getAttribute("src")!==item.src)image.src=item.src;
   else if(image.complete&&image.naturalWidth>0)image.parentElement.classList.add("is-loaded");
