@@ -52,3 +52,19 @@ footer.footer-reference .footer-inner>div+div{margin-top:8px}
 @media(max-width:960px){#menu .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}}
 @media(max-width:650px){#menu .menu-grid{grid-template-columns:minmax(0,1fr);gap:18px}#menu .banana-gallery{aspect-ratio:1.4/1}.banana-lightbox{width:min(96vw,880px)}.banana-lightbox .lightbox-detail{padding:16px 18px 22px}}
 @media(prefers-reduced-motion:reduce){#menu .banana-photo{transition:none}}
+
+
+/* Homepage-only cranberry raisin cookie carousel, photo placeholders, and modal */
+#menu .raisin-gallery .raisin-photo{opacity:0}
+#menu .raisin-gallery .gallery-image-button.is-loaded .raisin-photo{opacity:1}
+#menu .raisin-gallery .gallery-image-button.is-loaded .raisin-photo-placeholder{display:none}
+#menu .raisin-gallery .gallery-image-button:hover .raisin-photo{transform:scale(1.035)}
+.raisin-photo-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;background:linear-gradient(145deg,#f6e4ca,#fffbf0);color:var(--cocoa);font-size:3.3rem}
+.raisin-photo-placeholder small{font-size:.85rem;font-weight:800;letter-spacing:0}
+.raisin-lightbox .lightbox-image-wrap{min-height:240px;display:grid;place-items:center;overflow:hidden}
+.raisin-lightbox .lightbox-image-wrap img{opacity:0;aspect-ratio:16/9;min-height:240px}
+.raisin-lightbox .lightbox-image-wrap.is-loaded img{opacity:1}
+.raisin-lightbox .lightbox-image-wrap.is-loaded .raisin-photo-placeholder{display:none}
+.raisin-lightbox .lightbox-image-wrap .raisin-photo-placeholder{z-index:0}
+.raisin-lightbox .lightbox-image-wrap .lightbox-nav{z-index:4}
+.raisin-lightbox .raisin-lead-time{font-size:.79rem;margin-top:11px}
