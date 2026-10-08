@@ -45,8 +45,8 @@ function initBananaGallery(){
 
 /* Cranberry raisin images are supplied by the shop owner. 404s show an intentional placeholder. */
 const raisinGallery=[
- {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-overhead.webp",alt:"Freshly baked cranberry raisin oatmeal cookies on parchment paper over a cooling rack."},
- {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-with-milk.webp",alt:"Close-up of cranberry raisin oat cookies with a glass of milk."}
+ {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-overhead.webp?v=20261008-gallery-files-present",alt:"Freshly baked cranberry raisin oatmeal cookies on parchment paper over a cooling rack."},
+ {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-with-milk.webp?v=20261008-gallery-files-present",alt:"Close-up of cranberry raisin oat cookies with a glass of milk."}
 ];
 let raisinGalleryIndex=0;
 function updateRaisinGallery(index){
