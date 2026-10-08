@@ -45,6 +45,7 @@ function initBananaGallery(){
 
 /* Cranberry raisin images are supplied by the shop owner. 404s show an intentional placeholder. */
 const raisinGallery=[
+ {src:"/bale-bella-cranberry-raisin-oatmeal-cookie-single.webp?upload-check="+Date.now(),alt:"A large cranberry raisin oatmeal cookie on a white plate, with a glass of milk behind it."},
  {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-overhead.webp?v=20261008-gallery-files-present",alt:"Freshly baked cranberry raisin oatmeal cookies on parchment paper over a cooling rack."},
  {src:"/bale-bella-cranberry-raisin-oatmeal-cookies-with-milk.webp?v=20261008-gallery-files-present",alt:"Close-up of cranberry raisin oat cookies with a glass of milk."}
 ];
@@ -119,12 +120,12 @@ function renderMenu(){
    product.id==="cranberry-raisin"?
    `<div class="visual banana-gallery raisin-gallery" data-raisin-swipe>${badges}
     <button type="button" class="gallery-image-button" data-raisin-open aria-label="View Bella's Cranberry Raisin Oat Cookies photos and product details">
-     <span class="raisin-photo-placeholder" aria-hidden="true">🍪<small>Photos coming soon</small></span>
+     <span class="raisin-photo-placeholder" aria-hidden="true">🍪<small>Single-cookie photo coming soon</small></span>
      <img id="raisinGalleryImage" class="banana-photo raisin-photo" src="${raisinGallery[0].src}" alt="${raisinGallery[0].alt}" width="2048" height="1152" loading="lazy" decoding="async">
     </button>
     <button type="button" class="gallery-nav gallery-prev" data-raisin-step="-1" aria-label="Previous cranberry raisin cookie photo">‹</button>
     <button type="button" class="gallery-nav gallery-next" data-raisin-step="1" aria-label="Next cranberry raisin cookie photo">›</button>
-    <span class="gallery-count" id="raisinGalleryCount">1 / 2</span></div>`:
+    <span class="gallery-count" id="raisinGalleryCount">1 / ${raisinGallery.length}</span></div>`:
    `<div class="visual" aria-hidden="true">${badges}<span class="food-emoji">${product.emoji}</span></div>`;
   const options=product.id==="banana"?
    `<label class="banana-addon"><input type="checkbox" data-walnuts><span>Add crunchy walnuts</span><strong>+₱40</strong></label>`:
