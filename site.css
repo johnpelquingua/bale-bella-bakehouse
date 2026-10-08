@@ -72,5 +72,5 @@ footer.footer-reference .footer-inner>div+div{margin-top:8px}
 /* Clearly signpost the cranberry raisin quantity selection on the homepage */
 #menu .raisin-variant-prompt{display:block;color:var(--cocoa);font-weight:850;font-size:.86rem;line-height:1.45}
 #menu .raisin-order-hint{display:block;color:var(--muted);font-size:.76rem;line-height:1.45}
-#menu #raisinVariantSelect{border:2px solid var(--cocoa);background:#fffdf7;min-height:48px}
-#menu #raisinVariantSelect:focus-visible{outline:3px solid var(--butter);outline-offset:2px}
+#menu #raisinVariantSelect,#menu #doubleChocolateVariantSelect{border:2px solid var(--cocoa);background:#fffdf7;min-height:48px}
+#menu #raisinVariantSelect:focus-visible,#menu #doubleChocolateVariantSelect:focus-visible{outline:3px solid var(--butter);outline-offset:2px}
