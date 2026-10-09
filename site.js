@@ -164,28 +164,28 @@ function initDoubleChocolateGallery(){
   area.addEventListener("error",imgEvent,true);
   let x=0,y=0;
   area.addEventListener("touchstart",e=>{
-   if(!e.target.closest("[data-doubleChocolate-swipe]"))return;
+   if(!e.target.closest("[data-double-chocolate-swipe]"))return;
    x=e.changedTouches[0].screenX;y=e.changedTouches[0].screenY;
   },{passive:true});
   area.addEventListener("touchend",e=>{
-   if(!e.target.closest("[data-doubleChocolate-swipe]"))return;
+   if(!e.target.closest("[data-double-chocolate-swipe]"))return;
    const dx=e.changedTouches[0].screenX-x,dy=e.changedTouches[0].screenY-y;
    if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3)move(dx<0?1:-1);
   },{passive:true});
  }
  syncDoubleChocolateImage($("doubleChocolateLightboxImage"));
  grid.addEventListener("click",e=>{
-  const nav=e.target.closest("[data-doubleChocolate-step]");
+  const nav=e.target.closest("[data-double-chocolate-step]");
   if(nav){move(Number(nav.dataset.doubleChocolateStep));return}
-  if(e.target.closest("[data-doubleChocolate-open]")){
+  if(e.target.closest("[data-double-chocolate-open]")){
    updateDoubleChocolateGallery(doubleChocolateGalleryIndex);
    if(typeof dialog.showModal==="function")dialog.showModal();
   }
  });
  dialog.addEventListener("click",e=>{
-  const nav=e.target.closest("[data-doubleChocolate-lightbox-step]");
+  const nav=e.target.closest("[data-double-chocolate-lightbox-step]");
   if(nav){move(Number(nav.dataset.doubleChocolateLightboxStep));return}
-  if(e.target.closest("[data-doubleChocolate-lightbox-close]")||e.target===dialog)dialog.close();
+  if(e.target.closest("[data-double-chocolate-lightbox-close]")||e.target===dialog)dialog.close();
  });
  dialog.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight"){e.preventDefault();move(1)}
@@ -213,13 +213,13 @@ function renderMenu(){
     <button type="button" class="gallery-nav gallery-next" data-raisin-step="1" aria-label="Next cranberry raisin cookie photo">›</button>
     <span class="gallery-count" id="raisinGalleryCount">1 / ${raisinGallery.length}</span></div>`:
    product.id==="double-chocolate-chip"?
-   `<div class="visual banana-gallery raisin-gallery double-chocolate-gallery" data-doubleChocolate-swipe>${badges}
-    <button type="button" class="gallery-image-button" data-doubleChocolate-open aria-label="View Bella's Double Chocolate Chip Cookies photos and product details">
+   `<div class="visual banana-gallery raisin-gallery double-chocolate-gallery" data-double-chocolate-swipe>${badges}
+    <button type="button" class="gallery-image-button" data-double-chocolate-open aria-label="View Bella's Double Chocolate Chip Cookies photos and product details">
      <span class="raisin-photo-placeholder" aria-hidden="true">🍪<small>Product photo coming soon</small></span>
      <img id="doubleChocolateGalleryImage" class="banana-photo raisin-photo" src="${doubleChocolateGallery[0].src}" alt="${doubleChocolateGallery[0].alt}" width="2048" height="1152" loading="lazy" decoding="async">
     </button>
-    <button type="button" class="gallery-nav gallery-prev" data-doubleChocolate-step="-1" aria-label="Previous double chocolate chip cookie photo">‹</button>
-    <button type="button" class="gallery-nav gallery-next" data-doubleChocolate-step="1" aria-label="Next double chocolate chip cookie photo">›</button>
+    <button type="button" class="gallery-nav gallery-prev" data-double-chocolate-step="-1" aria-label="Previous double chocolate chip cookie photo">‹</button>
+    <button type="button" class="gallery-nav gallery-next" data-double-chocolate-step="1" aria-label="Next double chocolate chip cookie photo">›</button>
     <span class="gallery-count" id="doubleChocolateGalleryCount">1 / ${doubleChocolateGallery.length}</span></div>`:
    `<div class="visual" aria-hidden="true">${badges}<span class="food-emoji">${product.emoji}</span></div>`;
   const options=product.id==="banana"?
